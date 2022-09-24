@@ -1745,12 +1745,12 @@ gen_call(codegen_scope *s, node *tree, int val, int safe)
       nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
       if (nk < 0) nk = 15;
     }
-  }
-  if (tree && tree->cdr && tree->cdr->cdr) {
-    codegen(s, tree->cdr->cdr, VAL);
-    pop();
-    noop = 1;
-    blk = 1;
+    if (tree->cdr->cdr) {       /* block argument */
+      codegen(s, tree->cdr->cdr, VAL);
+      pop();
+      noop = 1;
+      blk = 1;
+    }
   }
   push();pop();
   s->sp = sp_save;
