@@ -19,6 +19,154 @@
 #include <ctype.h>
 #include <string.h>
 #include <mruby/internal.h>
+#include <lib-ruby-parser.h>
+
+#define LRP(x) LIB_RUBY_PARSER_##x
+
+MRB_INLINE mrb_sym
+lrp_sym(mrb_state *mrb, LRP(String) string)
+{
+  return mrb_intern(mrb, string.ptr, string.len);
+}
+
+MRB_INLINE mrb_sym
+lrp_sym_bytes(mrb_state *mrb, LRP(Bytes) bytes)
+{
+  return mrb_intern(mrb, bytes.raw.ptr, bytes.raw.len);
+}
+
+const char *
+node_type_name(LRP(Node) *node)
+{
+  if (!node) return "NULLPTR";
+  switch (node->tag) {
+    case LRP(NODE_ALIAS): return "alias";
+    case LRP(NODE_AND): return "and";
+    case LRP(NODE_AND_ASGN): return "and_asgn";
+    case LRP(NODE_ARG): return "arg";
+    case LRP(NODE_ARGS): return "args";
+    case LRP(NODE_ARRAY): return "array";
+    case LRP(NODE_ARRAY_PATTERN): return "array_pattern";
+    case LRP(NODE_ARRAY_PATTERN_WITH_TAIL): return "array_pattern_with_tail";
+    case LRP(NODE_BACK_REF): return "back_ref";
+    case LRP(NODE_BEGIN): return "begin";
+    case LRP(NODE_BLOCK): return "block";
+    case LRP(NODE_BLOCKARG): return "blockarg";
+    case LRP(NODE_BLOCK_PASS): return "block_pass";
+    case LRP(NODE_BREAK): return "break";
+    case LRP(NODE_CASE): return "case";
+    case LRP(NODE_CASE_MATCH): return "case_match";
+    case LRP(NODE_CASGN): return "casgn";
+    case LRP(NODE_CBASE): return "cbase";
+    case LRP(NODE_CLASS): return "class";
+    case LRP(NODE_COMPLEX): return "complex";
+    case LRP(NODE_CONST): return "const";
+    case LRP(NODE_CONST_PATTERN): return "const_pattern";
+    case LRP(NODE_C_SEND): return "c_send";
+    case LRP(NODE_CVAR): return "cvar";
+    case LRP(NODE_CVASGN): return "cvasgn";
+    case LRP(NODE_DEF): return "def";
+    case LRP(NODE_DEFINED): return "defined";
+    case LRP(NODE_DEFS): return "defs";
+    case LRP(NODE_DSTR): return "dstr";
+    case LRP(NODE_DSYM): return "dsym";
+    case LRP(NODE_E_FLIP_FLOP): return "e_flip_flop";
+    case LRP(NODE_EMPTY_ELSE): return "empty_else";
+    case LRP(NODE_ENCODING): return "encoding";
+    case LRP(NODE_ENSURE): return "ensure";
+    case LRP(NODE_ERANGE): return "erange";
+    case LRP(NODE_FALSE): return "false";
+    case LRP(NODE_FILE): return "file";
+    case LRP(NODE_FIND_PATTERN): return "find_pattern";
+    case LRP(NODE_FLOAT): return "float";
+    case LRP(NODE_FOR): return "for";
+    case LRP(NODE_FORWARD_ARG): return "forward_arg";
+    case LRP(NODE_FORWARDED_ARGS): return "forwarded_args";
+    case LRP(NODE_GVAR): return "gvar";
+    case LRP(NODE_GVASGN): return "gvasgn";
+    case LRP(NODE_HASH): return "hash";
+    case LRP(NODE_HASH_PATTERN): return "hash_pattern";
+    case LRP(NODE_HEREDOC): return "heredoc";
+    case LRP(NODE_IF): return "if";
+    case LRP(NODE_IF_GUARD): return "if_guard";
+    case LRP(NODE_I_FLIP_FLOP): return "i_flip_flop";
+    case LRP(NODE_IF_MOD): return "if_mod";
+    case LRP(NODE_IF_TERNARY): return "if_ternary";
+    case LRP(NODE_INDEX): return "index";
+    case LRP(NODE_INDEX_ASGN): return "index_asgn";
+    case LRP(NODE_IN_PATTERN): return "in_pattern";
+    case LRP(NODE_INT): return "int";
+    case LRP(NODE_IRANGE): return "irange";
+    case LRP(NODE_IVAR): return "ivar";
+    case LRP(NODE_IVASGN): return "ivasgn";
+    case LRP(NODE_KWARG): return "kwarg";
+    case LRP(NODE_KWARGS): return "kwargs";
+    case LRP(NODE_KW_BEGIN): return "kw_begin";
+    case LRP(NODE_KWNILARG): return "kwnilarg";
+    case LRP(NODE_KWOPTARG): return "kwoptarg";
+    case LRP(NODE_KWRESTARG): return "kwrestarg";
+    case LRP(NODE_KWSPLAT): return "kwsplat";
+    case LRP(NODE_LAMBDA): return "lambda";
+    case LRP(NODE_LINE): return "line";
+    case LRP(NODE_LVAR): return "lvar";
+    case LRP(NODE_LVASGN): return "lvasgn";
+    case LRP(NODE_MASGN): return "masgn";
+    case LRP(NODE_MATCH_ALT): return "match_alt";
+    case LRP(NODE_MATCH_AS): return "match_as";
+    case LRP(NODE_MATCH_CURRENT_LINE): return "match_current_line";
+    case LRP(NODE_MATCH_NIL_PATTERN): return "match_nil_pattern";
+    case LRP(NODE_MATCH_PATTERN): return "match_pattern";
+    case LRP(NODE_MATCH_PATTERN_P): return "match_pattern_p";
+    case LRP(NODE_MATCH_REST): return "match_rest";
+    case LRP(NODE_MATCH_VAR): return "match_var";
+    case LRP(NODE_MATCH_WITH_LVASGN): return "match_with_lvasgn";
+    case LRP(NODE_MLHS): return "mlhs";
+    case LRP(NODE_MODULE): return "module";
+    case LRP(NODE_NEXT): return "next";
+    case LRP(NODE_NIL): return "nil";
+    case LRP(NODE_NTH_REF): return "nth_ref";
+    case LRP(NODE_NUMBLOCK): return "numblock";
+    case LRP(NODE_OP_ASGN): return "op_asgn";
+    case LRP(NODE_OPTARG): return "optarg";
+    case LRP(NODE_OR): return "or";
+    case LRP(NODE_OR_ASGN): return "or_asgn";
+    case LRP(NODE_PAIR): return "pair";
+    case LRP(NODE_PIN): return "pin";
+    case LRP(NODE_POSTEXE): return "postexe";
+    case LRP(NODE_PREEXE): return "preexe";
+    case LRP(NODE_PROCARG0): return "procarg0";
+    case LRP(NODE_RATIONAL): return "rational";
+    case LRP(NODE_REDO): return "redo";
+    case LRP(NODE_REGEXP): return "regexp";
+    case LRP(NODE_REG_OPT): return "reg_opt";
+    case LRP(NODE_RESCUE): return "rescue";
+    case LRP(NODE_RESCUE_BODY): return "rescue_body";
+    case LRP(NODE_RESTARG): return "restarg";
+    case LRP(NODE_RETRY): return "retry";
+    case LRP(NODE_RETURN): return "return";
+    case LRP(NODE_S_CLASS): return "s_class";
+    case LRP(NODE_SELF_): return "self_";
+    case LRP(NODE_SEND): return "send";
+    case LRP(NODE_SHADOWARG): return "shadowarg";
+    case LRP(NODE_SPLAT): return "splat";
+    case LRP(NODE_STR): return "str";
+    case LRP(NODE_SUPER): return "super";
+    case LRP(NODE_SYM): return "sym";
+    case LRP(NODE_TRUE): return "true";
+    case LRP(NODE_UNDEF): return "undef";
+    case LRP(NODE_UNLESS_GUARD): return "unless_guard";
+    case LRP(NODE_UNTIL): return "until";
+    case LRP(NODE_UNTIL_POST): return "until_post";
+    case LRP(NODE_WHEN): return "when";
+    case LRP(NODE_WHILE): return "while";
+    case LRP(NODE_WHILE_POST): return "while_post";
+    case LRP(NODE_X_HEREDOC): return "x_heredoc";
+    case LRP(NODE_XSTR): return "xstr";
+    case LRP(NODE_YIELD): return "yield";
+    case LRP(NODE_Z_SUPER): return "z_super";
+    default: return "?";
+  }
+}
 
 #ifndef MRB_CODEGEN_LEVEL_MAX
 #define MRB_CODEGEN_LEVEL_MAX 256
@@ -48,6 +196,7 @@ struct loopinfo {
 
 typedef struct scope {
   mrb_state *mrb;
+  mrbc_context *cxt;
   mrb_pool *mpool;
 
   struct scope *prev;
@@ -62,11 +211,11 @@ typedef struct scope {
   mrb_bool mscope:1;
 
   struct loopinfo *loop;
-  mrb_sym filename_sym;
-  uint16_t lineno;
+  // mrb_sym filename_sym;
+  // uint16_t lineno;
 
   mrb_code *iseq;
-  uint16_t *lines;
+  // uint16_t *lines;
   uint32_t icapa;
 
   mrb_irep *irep;
@@ -80,14 +229,14 @@ typedef struct scope {
   uint16_t nregs;
   int ai;
 
-  int debug_start_pos;
-  uint16_t filename_index;
-  parser_state* parser;
+  // int debug_start_pos;
+  // uint16_t filename_index;
+  LRP(ParserResult) parser;
 
   int rlev;                     /* recursion levels */
 } codegen_scope;
 
-static codegen_scope* scope_new(mrb_state *mrb, codegen_scope *prev, node *lv);
+static codegen_scope* scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, node *lv);
 static void scope_finish(codegen_scope *s);
 static struct loopinfo *loop_push(codegen_scope *s, enum looptype t);
 static void loop_break(codegen_scope *s, node *tree);
@@ -102,10 +251,10 @@ static void loop_pop(codegen_scope *s, int val);
 static int catch_handler_new(codegen_scope *s);
 static void catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t begin, uint32_t end, uint32_t target);
 
-static void gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val);
+static void gen_assignment(codegen_scope *s, LRP(Node) *node, int sp, int val);
 static void gen_massignment(codegen_scope *s, node *tree, int sp, int val);
 
-static void codegen(codegen_scope *s, node *tree, int val);
+static void codegen(codegen_scope *s, LRP(Node) *node, mrb_bool val);
 static void raise_error(codegen_scope *s, const char *msg);
 
 static void
@@ -113,13 +262,13 @@ codegen_error(codegen_scope *s, const char *message)
 {
   if (!s) return;
 #ifndef MRB_NO_STDIO
-  if (s->filename_sym && s->lineno) {
-    const char *filename = mrb_sym_name_len(s->mrb, s->filename_sym, NULL);
-    fprintf(stderr, "%s:%d: %s\n", filename, s->lineno, message);
-  }
-  else {
+  // if (s->filename_sym && s->lineno) {
+  //   const char *filename = mrb_sym_name_len(s->mrb, s->filename_sym, NULL);
+  //   fprintf(stderr, "%s:%d: %s\n", filename, s->lineno, message);
+  // }
+  // else {
     fprintf(stderr, "%s\n", message);
-  }
+  // }
 #endif
   while (s->prev) {
     codegen_scope *tmp = s->prev;
@@ -142,7 +291,7 @@ codegen_error(codegen_scope *s, const char *message)
         }
         mrb_free(s->mrb, s->reps);
       }
-      mrb_free(s->mrb, s->lines);
+      // mrb_free(s->mrb, s->lines);
     }
     mrb_pool_close(s->mpool);
     s = tmp;
@@ -171,7 +320,7 @@ codegen_realloc(codegen_scope *s, void *p, size_t len)
 static void
 check_no_ext_ops(codegen_scope *s, uint16_t a, uint16_t b)
 {
-  if (s->parser->no_ext_ops && (a | b) > 0xff) {
+  if (s->cxt->no_ext_ops && (a | b) > 0xff) {
     codegen_error(s, "need OP_EXTs instruction (currently OP_EXTs are prohibited)");
   }
 }
@@ -196,16 +345,16 @@ emit_B(codegen_scope *s, uint32_t pc, uint8_t i)
       s->icapa *= 2;
     }
     s->iseq = (mrb_code*)codegen_realloc(s, s->iseq, sizeof(mrb_code)*s->icapa);
-    if (s->lines) {
-      s->lines = (uint16_t*)codegen_realloc(s, s->lines, sizeof(uint16_t)*s->icapa);
-    }
+    // if (s->lines) {
+    //   s->lines = (uint16_t*)codegen_realloc(s, s->lines, sizeof(uint16_t)*s->icapa);
+    // }
   }
-  if (s->lines) {
-    if (s->lineno > 0 || pc == 0)
-      s->lines[pc] = s->lineno;
-    else
-      s->lines[pc] = s->lines[pc-1];
-  }
+  // if (s->lines) {
+  //   if (s->lineno > 0 || pc == 0)
+  //     s->lines[pc] = s->lineno;
+  //   else
+  //     s->lines[pc] = s->lines[pc-1];
+  // }
   s->iseq[pc] = i;
 }
 
@@ -322,68 +471,68 @@ genop_W(codegen_scope *s, mrb_code i, uint32_t a)
   gen_B(s, a3);
 }
 
-#define NOVAL  0
-#define VAL    1
+#define NOVAL  FALSE
+#define VAL    TRUE
 
 static mrb_bool
 no_optimize(codegen_scope *s)
 {
-  if (s && s->parser && s->parser->no_optimize)
+  if (s && s->cxt && s->cxt->no_optimize)
     return TRUE;
   return FALSE;
 }
 
-struct mrb_insn_data
-mrb_decode_insn(const mrb_code *pc)
-{
-  struct mrb_insn_data data = { 0 };
-  if (pc == 0) return data;
-  data.addr = pc;
-  mrb_code insn = READ_B();
-  uint16_t a = 0;
-  uint16_t b = 0;
-  uint16_t c = 0;
-
-  switch (insn) {
-#define FETCH_Z() /* empty */
-#define OPCODE(i,x) case OP_ ## i: FETCH_ ## x (); break;
-#include "mruby/ops.h"
-#undef OPCODE
-  }
-  switch (insn) {
-  case OP_EXT1:
-    insn = READ_B();
-    switch (insn) {
-#define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _1 (); break;
-#include "mruby/ops.h"
-#undef OPCODE
-    }
-    break;
-  case OP_EXT2:
-    insn = READ_B();
-    switch (insn) {
-#define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _2 (); break;
-#include "mruby/ops.h"
-#undef OPCODE
-    }
-    break;
-  case OP_EXT3:
-    insn = READ_B();
-    switch (insn) {
-#define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _3 (); break;
-#include "mruby/ops.h"
-#undef OPCODE
-    }
-    break;
-  default:
-    break;
-  }
-  data.insn = insn;
-  data.a = a;
-  data.b = b;
-  data.c = c;
-  return data;
-}
+// struct mrb_insn_data
+// mrb_decode_insn(const mrb_code *pc)
+// {
+//   struct mrb_insn_data data = { 0 };
+//   if (pc == 0) return data;
+//   data.addr = pc;
+//   mrb_code insn = READ_B();
+//   uint16_t a = 0;
+//   uint16_t b = 0;
+//   uint16_t c = 0;
+//
+//   switch (insn) {
+// #define FETCH_Z() /* empty */
+// #define OPCODE(i,x) case OP_ ## i: FETCH_ ## x (); break;
+// #include "mruby/ops.h"
+// #undef OPCODE
+//   }
+//   switch (insn) {
+//   case OP_EXT1:
+//     insn = READ_B();
+//     switch (insn) {
+// #define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _1 (); break;
+// #include "mruby/ops.h"
+// #undef OPCODE
+//     }
+//     break;
+//   case OP_EXT2:
+//     insn = READ_B();
+//     switch (insn) {
+// #define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _2 (); break;
+// #include "mruby/ops.h"
+// #undef OPCODE
+//     }
+//     break;
+//   case OP_EXT3:
+//     insn = READ_B();
+//     switch (insn) {
+// #define OPCODE(i,x) case OP_ ## i: FETCH_ ## x ## _3 (); break;
+// #include "mruby/ops.h"
+// #undef OPCODE
+//     }
+//     break;
+//   default:
+//     break;
+//   }
+//   data.insn = insn;
+//   data.a = a;
+//   data.b = b;
+//   data.c = c;
+//   return data;
+// }
 
 #undef OPCODE
 #define Z 1
@@ -1001,13 +1150,11 @@ lit_pool_extend(codegen_scope *s)
 }
 
 static int
-new_litbint(codegen_scope *s, const char *p, int base, mrb_bool neg)
+new_litbint(codegen_scope *s, const char *p, size_t plen, int base, mrb_bool neg)
 {
   int i;
-  size_t plen;
   mrb_pool_value *pv;
 
-  plen = strlen(p);
   if (plen > 255) {
     codegen_error(s, "integer too big");
   }
@@ -1261,7 +1408,7 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
   }
 
   if (lv < 1) lv = 1;
-  u = s->parser->upper;
+  u = s->cxt->upper;
   while (u && !MRB_PROC_CFUNC_P(u)) {
     const struct mrb_irep *ir = u->body.irep;
     uint_fast16_t n = ir->nlocals;
@@ -1296,53 +1443,53 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
   return -1; /* not reached */
 }
 
-static void
-for_body(codegen_scope *s, node *tree)
-{
-  codegen_scope *prev = s;
-  int idx;
-  struct loopinfo *lp;
-  node *n2;
+// static void
+// for_body(codegen_scope *s, node *tree)
+// {
+//   codegen_scope *prev = s;
+//   int idx;
+//   struct loopinfo *lp;
+//   node *n2;
 
-  /* generate receiver */
-  codegen(s, tree->cdr->car, VAL);
-  /* generate loop-block */
-  s = scope_new(s->mrb, s, NULL);
+//   /* generate receiver */
+//   codegen(s, tree->cdr->car, VAL);
+//   /* generate loop-block */
+//   s = scope_new(s->mrb, s, NULL);
 
-  push();                       /* push for a block parameter */
+//   push();                       /* push for a block parameter */
 
-  /* generate loop variable */
-  n2 = tree->car;
-  genop_W(s, OP_ENTER, 0x40000);
-  if (n2->car && !n2->car->cdr && !n2->cdr) {
-    gen_assignment(s, n2->car->car, NULL, 1, NOVAL);
-  }
-  else {
-    gen_massignment(s, n2, 1, VAL);
-  }
-  /* construct loop */
-  lp = loop_push(s, LOOP_FOR);
-  lp->pc1 = new_label(s);
+//   /* generate loop variable */
+//   n2 = tree->car;
+//   genop_W(s, OP_ENTER, 0x40000);
+//   if (n2->car && !n2->car->cdr && !n2->cdr) {
+//     gen_assignment(s, n2->car->car, NULL, 1, NOVAL);
+//   }
+//   else {
+//     gen_massignment(s, n2, 1, VAL);
+//   }
+//   /* construct loop */
+//   lp = loop_push(s, LOOP_FOR);
+//   lp->pc1 = new_label(s);
 
-  /* loop body */
-  codegen(s, tree->cdr->cdr->car, VAL);
-  pop();
-  gen_return(s, OP_RETURN, cursp());
-  loop_pop(s, NOVAL);
-  scope_finish(s);
-  s = prev;
-  genop_2(s, OP_BLOCK, cursp(), s->irep->rlen-1);
-  push();pop(); /* space for a block */
-  pop();
-  idx = new_sym(s, MRB_SYM_2(s->mrb, each));
-  genop_3(s, OP_SENDB, cursp(), idx, 0);
-}
+//   /* loop body */
+//   codegen(s, tree->cdr->cdr->car, VAL);
+//   pop();
+//   gen_return(s, OP_RETURN, cursp());
+//   loop_pop(s, NOVAL);
+//   scope_finish(s);
+//   s = prev;
+//   genop_2(s, OP_BLOCK, cursp(), s->irep->rlen-1);
+//   push();pop(); /* space for a block */
+//   pop();
+//   idx = new_sym(s, MRB_SYM_2(s->mrb, each));
+//   genop_3(s, OP_SENDB, cursp(), idx, 0);
+// }
 
 static int
-lambda_body(codegen_scope *s, node *tree, int blk)
+lambda_body(codegen_scope *s, node *nlv, LRP(Node) *args, LRP(Node) *body, mrb_bool blk)
 {
   codegen_scope *parent = s;
-  s = scope_new(s->mrb, s, tree->car);
+  s = scope_new(s->mrb, s->cxt, s, nlv);
 
   s->mscope = !blk;
 
@@ -1350,161 +1497,162 @@ lambda_body(codegen_scope *s, node *tree, int blk)
     struct loopinfo *lp = loop_push(s, LOOP_BLOCK);
     lp->pc0 = new_label(s);
   }
-  tree = tree->cdr;
-  if (tree->car == NULL) {
+  // TODO
+  // tree = tree->cdr;
+  // if (tree->car == NULL) {
     genop_W(s, OP_ENTER, 0);
     s->ainfo = 0;
-  }
-  else {
-    mrb_aspec a;
-    int ma, oa, ra, pa, ka, kd, ba, i;
-    uint32_t pos;
-    node *opt;
-    node *margs, *pargs;
-    node *tail;
+  // }
+  // else {
+  //   mrb_aspec a;
+  //   int ma, oa, ra, pa, ka, kd, ba, i;
+  //   uint32_t pos;
+  //   node *opt;
+  //   node *margs, *pargs;
+  //   node *tail;
 
-    /* mandatory arguments */
-    ma = node_len(tree->car->car);
-    margs = tree->car->car;
-    tail = tree->car->cdr->cdr->cdr->cdr;
+  //   /* mandatory arguments */
+  //   ma = node_len(tree->car->car);
+  //   margs = tree->car->car;
+  //   tail = tree->car->cdr->cdr->cdr->cdr;
 
-    /* optional arguments */
-    oa = node_len(tree->car->cdr->car);
-    /* rest argument? */
-    ra = tree->car->cdr->cdr->car ? 1 : 0;
-    /* mandatory arguments after rest argument */
-    pa = node_len(tree->car->cdr->cdr->cdr->car);
-    pargs = tree->car->cdr->cdr->cdr->car;
-    /* keyword arguments */
-    ka = tail? node_len(tail->cdr->car) : 0;
-    /* keyword dictionary? */
-    kd = tail && tail->cdr->cdr->car? 1 : 0;
-    /* block argument? */
-    ba = tail && tail->cdr->cdr->cdr->car ? 1 : 0;
+  //   /* optional arguments */
+  //   oa = node_len(tree->car->cdr->car);
+  //   /* rest argument? */
+  //   ra = tree->car->cdr->cdr->car ? 1 : 0;
+  //   /* mandatory arguments after rest argument */
+  //   pa = node_len(tree->car->cdr->cdr->cdr->car);
+  //   pargs = tree->car->cdr->cdr->cdr->car;
+  //   /* keyword arguments */
+  //   ka = tail? node_len(tail->cdr->car) : 0;
+  //   /* keyword dictionary? */
+  //   kd = tail && tail->cdr->cdr->car? 1 : 0;
+  //   /* block argument? */
+  //   ba = tail && tail->cdr->cdr->cdr->car ? 1 : 0;
 
-    if (ma > 0x1f || oa > 0x1f || pa > 0x1f || ka > 0x1f) {
-      codegen_error(s, "too many formal arguments");
-    }
-    /* (23bits = 5:5:1:5:5:1:1) */
-    a = MRB_ARGS_REQ(ma)
-      | MRB_ARGS_OPT(oa)
-      | (ra? MRB_ARGS_REST() : 0)
-      | MRB_ARGS_POST(pa)
-      | MRB_ARGS_KEY(ka, kd)
-      | (ba? MRB_ARGS_BLOCK() : 0);
-    genop_W(s, OP_ENTER, a);
-    /* (12bits = 5:1:5:1) */
-    s->ainfo = (((ma+oa) & 0x3f) << 7)
-      | ((ra & 0x1) << 6)
-      | ((pa & 0x1f) << 1)
-      | ((ka | kd) ? 1 : 0);
-    /* generate jump table for optional arguments initializer */
-    pos = new_label(s);
-    for (i=0; i<oa; i++) {
-      new_label(s);
-      genjmp_0(s, OP_JMP);
-    }
-    if (oa > 0) {
-      genjmp_0(s, OP_JMP);
-    }
-    opt = tree->car->cdr->car;
-    i = 0;
-    while (opt) {
-      int idx;
-      mrb_sym id = nsym(opt->car->car);
+  //   if (ma > 0x1f || oa > 0x1f || pa > 0x1f || ka > 0x1f) {
+  //     codegen_error(s, "too many formal arguments");
+  //   }
+  //   /* (23bits = 5:5:1:5:5:1:1) */
+  //   a = MRB_ARGS_REQ(ma)
+  //     | MRB_ARGS_OPT(oa)
+  //     | (ra? MRB_ARGS_REST() : 0)
+  //     | MRB_ARGS_POST(pa)
+  //     | MRB_ARGS_KEY(ka, kd)
+  //     | (ba? MRB_ARGS_BLOCK() : 0);
+  //   genop_W(s, OP_ENTER, a);
+  //   /* (12bits = 5:1:5:1) */
+  //   s->ainfo = (((ma+oa) & 0x3f) << 7)
+  //     | ((ra & 0x1) << 6)
+  //     | ((pa & 0x1f) << 1)
+  //     | ((ka | kd) ? 1 : 0);
+  //   /* generate jump table for optional arguments initializer */
+  //   pos = new_label(s);
+  //   for (i=0; i<oa; i++) {
+  //     new_label(s);
+  //     genjmp_0(s, OP_JMP);
+  //   }
+  //   if (oa > 0) {
+  //     genjmp_0(s, OP_JMP);
+  //   }
+  //   opt = tree->car->cdr->car;
+  //   i = 0;
+  //   while (opt) {
+  //     int idx;
+  //     mrb_sym id = nsym(opt->car->car);
 
-      dispatch(s, pos+i*3+1);
-      codegen(s, opt->car->cdr, VAL);
-      pop();
-      idx = lv_idx(s, id);
-      if (idx > 0) {
-        gen_move(s, idx, cursp(), 0);
-      }
-      else {
-        gen_getupvar(s, cursp(), id);
-      }
-      i++;
-      opt = opt->cdr;
-    }
-    if (oa > 0) {
-      dispatch(s, pos+i*3+1);
-    }
+  //     dispatch(s, pos+i*3+1);
+  //     codegen(s, opt->car->cdr, VAL);
+  //     pop();
+  //     idx = lv_idx(s, id);
+  //     if (idx > 0) {
+  //       gen_move(s, idx, cursp(), 0);
+  //     }
+  //     else {
+  //       gen_getupvar(s, cursp(), id);
+  //     }
+  //     i++;
+  //     opt = opt->cdr;
+  //   }
+  //   if (oa > 0) {
+  //     dispatch(s, pos+i*3+1);
+  //   }
 
-    /* keyword arguments */
-    if (tail) {
-      node *kwds = tail->cdr->car;
-      int kwrest = 0;
+  //   /* keyword arguments */
+  //   if (tail) {
+  //     node *kwds = tail->cdr->car;
+  //     int kwrest = 0;
 
-      if (tail->cdr->cdr->car) {
-        kwrest = 1;
-      }
-      mrb_assert(nint(tail->car) == NODE_ARGS_TAIL);
-      mrb_assert(node_len(tail) == 4);
+  //     if (tail->cdr->cdr->car) {
+  //       kwrest = 1;
+  //     }
+  //     mrb_assert(nint(tail->car) == NODE_ARGS_TAIL);
+  //     mrb_assert(node_len(tail) == 4);
 
-      while (kwds) {
-        int jmpif_key_p, jmp_def_set = -1;
-        node *kwd = kwds->car, *def_arg = kwd->cdr->cdr->car;
-        mrb_sym kwd_sym = nsym(kwd->cdr->car);
+  //     while (kwds) {
+  //       int jmpif_key_p, jmp_def_set = -1;
+  //       node *kwd = kwds->car, *def_arg = kwd->cdr->cdr->car;
+  //       mrb_sym kwd_sym = nsym(kwd->cdr->car);
 
-        mrb_assert(nint(kwd->car) == NODE_KW_ARG);
+  //       mrb_assert(nint(kwd->car) == NODE_KW_ARG);
 
-        if (def_arg) {
-          int idx;
-          genop_2(s, OP_KEY_P, lv_idx(s, kwd_sym), new_sym(s, kwd_sym));
-          jmpif_key_p = genjmp2_0(s, OP_JMPIF, lv_idx(s, kwd_sym), NOVAL);
-          codegen(s, def_arg, VAL);
-          pop();
-          idx = lv_idx(s, kwd_sym);
-          if (idx > 0) {
-            gen_move(s, idx, cursp(), 0);
-          }
-          else {
-            gen_getupvar(s, cursp(), kwd_sym);
-          }
-          jmp_def_set = genjmp_0(s, OP_JMP);
-          dispatch(s, jmpif_key_p);
-        }
-        genop_2(s, OP_KARG, lv_idx(s, kwd_sym), new_sym(s, kwd_sym));
-        if (jmp_def_set != -1) {
-          dispatch(s, jmp_def_set);
-        }
-        i++;
+  //       if (def_arg) {
+  //         int idx;
+  //         genop_2(s, OP_KEY_P, lv_idx(s, kwd_sym), new_sym(s, kwd_sym));
+  //         jmpif_key_p = genjmp2_0(s, OP_JMPIF, lv_idx(s, kwd_sym), NOVAL);
+  //         codegen(s, def_arg, VAL);
+  //         pop();
+  //         idx = lv_idx(s, kwd_sym);
+  //         if (idx > 0) {
+  //           gen_move(s, idx, cursp(), 0);
+  //         }
+  //         else {
+  //           gen_getupvar(s, cursp(), kwd_sym);
+  //         }
+  //         jmp_def_set = genjmp_0(s, OP_JMP);
+  //         dispatch(s, jmpif_key_p);
+  //       }
+  //       genop_2(s, OP_KARG, lv_idx(s, kwd_sym), new_sym(s, kwd_sym));
+  //       if (jmp_def_set != -1) {
+  //         dispatch(s, jmp_def_set);
+  //       }
+  //       i++;
 
-        kwds = kwds->cdr;
-      }
-      if (tail->cdr->car && !kwrest) {
-        genop_0(s, OP_KEYEND);
-      }
-    }
+  //       kwds = kwds->cdr;
+  //     }
+  //     if (tail->cdr->car && !kwrest) {
+  //       genop_0(s, OP_KEYEND);
+  //     }
+  //   }
 
-    /* argument destructuring */
-    if (margs) {
-      node *n = margs;
+  //   /* argument destructuring */
+  //   if (margs) {
+  //     node *n = margs;
 
-      pos = 1;
-      while (n) {
-        if (nint(n->car->car) == NODE_MASGN) {
-          gen_massignment(s, n->car->cdr->car, pos, NOVAL);
-        }
-        pos++;
-        n = n->cdr;
-      }
-    }
-    if (pargs) {
-      node *n = pargs;
+  //     pos = 1;
+  //     while (n) {
+  //       if (nint(n->car->car) == NODE_MASGN) {
+  //         gen_massignment(s, n->car->cdr->car, pos, NOVAL);
+  //       }
+  //       pos++;
+  //       n = n->cdr;
+  //     }
+  //   }
+  //   if (pargs) {
+  //     node *n = pargs;
 
-      pos = ma+oa+ra+1;
-      while (n) {
-        if (nint(n->car->car) == NODE_MASGN) {
-          gen_massignment(s, n->car->cdr->car, pos, NOVAL);
-        }
-        pos++;
-        n = n->cdr;
-      }
-    }
-  }
+  //     pos = ma+oa+ra+1;
+  //     while (n) {
+  //       if (nint(n->car->car) == NODE_MASGN) {
+  //         gen_massignment(s, n->car->cdr->car, pos, NOVAL);
+  //       }
+  //       pos++;
+  //       n = n->cdr;
+  //     }
+  //   }
+  // }
 
-  codegen(s, tree->cdr->car, VAL);
+  codegen(s, body, VAL);
   pop();
   if (s->pc > 0) {
     gen_return(s, OP_RETURN, cursp());
@@ -1517,11 +1665,11 @@ lambda_body(codegen_scope *s, node *tree, int blk)
 }
 
 static int
-scope_body(codegen_scope *s, node *tree, int val)
+scope_body(codegen_scope *s, node *nlv, LRP(Node) *node, int val)
 {
-  codegen_scope *scope = scope_new(s->mrb, s, tree->car);
+  codegen_scope *scope = scope_new(s->mrb, s->cxt, s, nlv);
 
-  codegen(scope, tree->cdr, VAL);
+  codegen(scope, node, VAL);
   gen_return(scope, OP_RETURN, scope->sp-1);
   if (!s->iseq) {
     genop_0(scope, OP_STOP);
@@ -1570,7 +1718,7 @@ attrsym(codegen_scope *s, mrb_sym a)
 #define GEN_VAL_STACK_MAX 99
 
 static int
-gen_values(codegen_scope *s, node *t, int val, int limit)
+gen_args(codegen_scope *s, LRP(NodeList) nodes, mrb_bool val, int limit, LRP(Kwargs) **kwargs, LRP(BlockPass) **block)
 {
   int n = 0;
   int first = 1;
@@ -1580,16 +1728,26 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
   if (cursp() >= slimit) slimit = INT16_MAX;
 
   if (!val) {
-    while (t) {
-      codegen(s, t->car, NOVAL);
+    for (size_t i = 0; i < nodes.len; i++) {
+      codegen(s, nodes.ptr + i, NOVAL);
       n++;
-      t = t->cdr;
     }
     return n;
   }
 
-  while (t) {
-    int is_splat = nint(t->car->car) == NODE_SPLAT;
+  for (size_t i = 0; i < nodes.len; i++) {
+    LRP(Node) *node = nodes.ptr + i;
+    switch (node->tag) {
+    case LRP(NODE_KWARGS):
+      if (kwargs) *kwargs = &node->as.kwargs;
+      continue;
+    case LRP(NODE_BLOCK_PASS):
+      if (block) *block = &node->as.block_pass;
+      continue;
+    }
+
+    // int is_splat = nint(t->car->car) == NODE_SPLAT;
+    mrb_bool is_splat = FALSE; // TODO
 
     if (is_splat || cursp() >= slimit) { /* flush stack */
       pop_n(n);
@@ -1611,7 +1769,7 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
       }
       n = 0;
     }
-    codegen(s, t->car, val);
+    codegen(s, node, val);
     if (is_splat) {
       pop(); pop();
       genop_1(s, OP_ARYCAT, cursp());
@@ -1620,7 +1778,6 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
     else {
       n++;
     }
-    t = t->cdr;
   }
   if (!first) {
     pop();
@@ -1639,7 +1796,13 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
 }
 
 static int
-gen_hash(codegen_scope *s, node *tree, int val, int limit)
+gen_values(codegen_scope *s, LRP(NodeList) nodes, mrb_bool val, int limit)
+{
+  return gen_args(s, nodes, val, limit, NULL, NULL);
+}
+
+static int
+gen_hash(codegen_scope *s, LRP(NodeList) pairs, mrb_bool val, int limit)
 {
   int slimit = GEN_VAL_STACK_MAX;
   if (cursp() >= GEN_LIT_ARY_MAX) slimit = INT16_MAX;
@@ -1647,8 +1810,9 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
   mrb_bool update = FALSE;
   mrb_bool first = TRUE;
 
-  while (tree) {
-    if (nint(tree->car->car->car) == NODE_KW_REST_ARGS) {
+  for (size_t i = 0; i < pairs.len; i++) {
+    LRP(Node) node = pairs.ptr[i];
+    if (node.tag == LRP(NODE_KWSPLAT)) {
       if (val && first) {
         genop_2(s, OP_HASH, cursp(), 0);
         push();
@@ -1665,7 +1829,7 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
         }
         push();
       }
-      codegen(s, tree->car->cdr, val);
+      codegen(s, node.as.kwsplat.value, val);
       if (val && (len > 0 || update)) {
         pop(); pop();
         genop_1(s, OP_HASHCAT, cursp());
@@ -1675,11 +1839,11 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
       len = 0;
     }
     else {
-      codegen(s, tree->car->car, val);
-      codegen(s, tree->car->cdr, val);
+      LRP(Pair) pair = node.as.pair;
+      codegen(s, pair.key, val);
+      codegen(s, pair.value, val);
       len++;
     }
-    tree = tree->cdr;
     if (val && cursp() >= slimit) {
       pop_n(len*2);
       if (!update) {
@@ -1713,42 +1877,83 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
 }
 
 static void
-gen_call(codegen_scope *s, node *tree, int val, int safe)
+gen_call(codegen_scope *s, LRP(Node) *call, LRP(Block) *block, mrb_bool val)
 {
-  mrb_sym sym = nsym(tree->cdr->car);
+  LRP(Node) *recv;
+  LRP(String) method_name;
+  LRP(NodeList) args;
+  mrb_bool safe;
+
+  switch (call->tag) {
+  case LRP(NODE_SEND):
+    {
+      LRP(Send) send = call->as.send;
+      recv = send.recv;
+      method_name = send.method_name;
+      args = send.args;
+      safe = FALSE;
+      break;
+    }
+  case LRP(NODE_C_SEND):
+    {
+      LRP(CSend) send = call->as.c_send;
+      recv = send.recv;
+      method_name = send.method_name;
+      args = send.args;
+      safe = TRUE;
+      break;
+    }
+  case LRP(NODE_LAMBDA):
+    if (val) {
+      mrb_assert(block);
+      int idx = lambda_body(s, NULL, block->args, block->body, TRUE);
+      genop_2(s, OP_LAMBDA, cursp(), idx);
+      push();
+    }
+    return;
+  default:
+    codegen_error(s, "unknown call type");
+  }
+
+  mrb_sym sym = lrp_sym(s->mrb, method_name);
   int skip = 0, n = 0, nk = 0, noop = no_optimize(s), noself = 0, blk = 0, sp_save = cursp();
 
-  if (!tree->car) {
+  if (!recv) {
     noself = noop = 1;
     push();
   }
   else {
-    codegen(s, tree->car, VAL); /* receiver */
+    codegen(s, recv, VAL); /* receiver */
   }
   if (safe) {
     int recv = cursp()-1;
     gen_move(s, cursp(), recv, 1);
     skip = genjmp2_0(s, OP_JMPNIL, cursp(), val);
   }
-  tree = tree->cdr->cdr->car;
-  if (tree) {
-    if (tree->car) {            /* positional arguments */
-      n = gen_values(s, tree->car, VAL, 14);
-      if (n < 0) {              /* variable length */
-        noop = 1;               /* not operator */
-        n = 15;
-        push();
-      }
+  if (args.len) {
+    LRP(Kwargs) *kwargs = NULL;
+    LRP(BlockPass) *block_pass = NULL;
+    n = gen_args(s, args, VAL, 14, &kwargs, &block_pass);
+    if (n < 0) {              /* variable length */
+      noop = 1;               /* not operator */
+      n = 15;
+      push();
     }
-    if (tree->cdr->car) {       /* keyword arguments */
+    if (kwargs) {
       noop = 1;
-      nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
+      nk = gen_hash(s, kwargs->pairs, VAL, 14);
       if (nk < 0) nk = 15;
     }
+    if (block_pass) {
+      codegen(s, block_pass->value, VAL);
+      pop();
+      noop = 1;
+      blk = 1;
+    }
   }
-  if (tree && tree->cdr && tree->cdr->cdr) {
-    codegen(s, tree->cdr->cdr, VAL);
-    pop();
+  if (block) {
+    int idx = lambda_body(s, NULL, block->args, block->body, TRUE);
+    genop_2(s, OP_BLOCK, cursp(), idx);
     noop = 1;
     blk = 1;
   }
@@ -1805,52 +2010,63 @@ gen_call(codegen_scope *s, node *tree, int val, int safe)
 }
 
 static void
-gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
+gen_assignment(codegen_scope *s, LRP(Node) *node, int sp, int val)
 {
   int idx;
-  int type = nint(tree->car);
+  // int type = nint(tree->car);
+  LRP(String) name;
+  LRP(Node) *rhs = NULL;
 
-  switch (type) {
-  case NODE_GVAR:
-  case NODE_ARG:
-  case NODE_LVAR:
-  case NODE_IVAR:
-  case NODE_CVAR:
-  case NODE_CONST:
-  case NODE_NIL:
-  case NODE_MASGN:
-    if (rhs) {
-      codegen(s, rhs, VAL);
-      pop();
-      sp = cursp();
-    }
+  switch (node->tag) {
+  // case NODE_GVAR:
+  // case NODE_ARG:
+  case LRP(NODE_LVASGN):
+    name = node->as.lvasgn.name;
+    rhs = node->as.lvasgn.value;
     break;
+  // case NODE_IVAR:
+  // case NODE_CVAR:
+  // case NODE_CONST:
+  // case NODE_NIL:
+  // case NODE_MASGN:
+  //   if (rhs) {
+  //     codegen(s, rhs, VAL);
+  //     pop();
+  //     sp = cursp();
+  //   }
+  //   break;
 
-  case NODE_COLON2:
-  case NODE_COLON3:
-  case NODE_CALL:
-  case NODE_SCALL:
-    /* keep evaluation order */
-    break;
+  // case NODE_COLON2:
+  // case NODE_COLON3:
+  // case NODE_CALL:
+  // case NODE_SCALL:
+  //   /* keep evaluation order */
+  //   break;
 
-  case NODE_NVAR:
-    /* never happens; should have already checked in the parser */
-    codegen_error(s, "Can't assign to numbered parameter");
-    break;
+  // case NODE_NVAR:
+  //   /* never happens; should have already checked in the parser */
+  //   codegen_error(s, "Can't assign to numbered parameter");
+  //   break;
 
   default:
     codegen_error(s, "unknown lhs");
     break;
   }
 
-  tree = tree->cdr;
-  switch (type) {
-  case NODE_GVAR:
-    gen_setxv(s, OP_SETGV, sp, nsym(tree), val);
-    break;
-  case NODE_ARG:
-  case NODE_LVAR:
-    idx = lv_idx(s, nsym(tree));
+  if (rhs) {
+    codegen(s, rhs, VAL);
+    pop();
+    sp = cursp();
+  }
+
+  // tree = tree->cdr;
+  switch (node->tag) {
+  // case NODE_GVAR:
+  //   gen_setxv(s, OP_SETGV, sp, nsym(tree), val);
+  //   break;
+  // case NODE_ARG:
+  case LRP(NODE_LVASGN):
+    idx = lv_idx(s, lrp_sym(s->mrb, name));
     if (idx > 0) {
       if (idx != sp) {
         gen_move(s, idx, sp, val);
@@ -1858,198 +2074,198 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
       break;
     }
     else {                      /* upvar */
-      gen_setupvar(s, sp, nsym(tree));
+      gen_setupvar(s, sp, lrp_sym(s->mrb, name));
     }
     break;
-  case NODE_IVAR:
-    gen_setxv(s, OP_SETIV, sp, nsym(tree), val);
-    break;
-  case NODE_CVAR:
-    gen_setxv(s, OP_SETCV, sp, nsym(tree), val);
-    break;
-  case NODE_CONST:
-    gen_setxv(s, OP_SETCONST, sp, nsym(tree), val);
-    break;
-  case NODE_COLON2:
-  case NODE_COLON3:
-    if (sp) {
-      gen_move(s, cursp(), sp, 0);
-    }
-    sp = cursp();
-    push();
-    if (type == NODE_COLON2) {
-      codegen(s, tree->car, VAL);
-      idx = new_sym(s, nsym(tree->cdr));
-    }
-    else {   /* NODE_COLON3 */
-      genop_1(s, OP_OCLASS, cursp());
-      push();
-      idx = new_sym(s, nsym(tree));
-    }
-    if (rhs) {
-      codegen(s, rhs, VAL); pop();
-      gen_move(s, sp, cursp(), 0);
-    }
-    pop_n(2);
-    genop_2(s, OP_SETMCNST, sp, idx);
-    break;
+  // case NODE_IVAR:
+  //   gen_setxv(s, OP_SETIV, sp, nsym(tree), val);
+  //   break;
+  // case NODE_CVAR:
+  //   gen_setxv(s, OP_SETCV, sp, nsym(tree), val);
+  //   break;
+  // case NODE_CONST:
+  //   gen_setxv(s, OP_SETCONST, sp, nsym(tree), val);
+  //   break;
+  // case NODE_COLON2:
+  // case NODE_COLON3:
+  //   if (sp) {
+  //     gen_move(s, cursp(), sp, 0);
+  //   }
+  //   sp = cursp();
+  //   push();
+  //   if (type == NODE_COLON2) {
+  //     codegen(s, tree->car, VAL);
+  //     idx = new_sym(s, nsym(tree->cdr));
+  //   }
+  //   else {   /* NODE_COLON3 */
+  //     genop_1(s, OP_OCLASS, cursp());
+  //     push();
+  //     idx = new_sym(s, nsym(tree));
+  //   }
+  //   if (rhs) {
+  //     codegen(s, rhs, VAL); pop();
+  //     gen_move(s, sp, cursp(), 0);
+  //   }
+  //   pop_n(2);
+  //   genop_2(s, OP_SETMCNST, sp, idx);
+  //   break;
 
-  case NODE_CALL:
-  case NODE_SCALL:
-    {
-      int noself = 0, safe = (type == NODE_SCALL), skip = 0, top, call, n = 0;
-      mrb_sym mid = nsym(tree->cdr->car);
+  // case NODE_CALL:
+  // case NODE_SCALL:
+  //   {
+  //     int noself = 0, safe = (type == NODE_SCALL), skip = 0, top, call, n = 0;
+  //     mrb_sym mid = nsym(tree->cdr->car);
 
-      top = cursp();
-      if (val || sp == cursp()) {
-        push();                   /* room for retval */
-      }
-      call = cursp();
-      if (!tree->car) {
-        noself = 1;
-        push();
-      }
-      else {
-        codegen(s, tree->car, VAL); /* receiver */
-      }
-      if (safe) {
-        int recv = cursp()-1;
-        gen_move(s, cursp(), recv, 1);
-        skip = genjmp2_0(s, OP_JMPNIL, cursp(), val);
-      }
-      tree = tree->cdr->cdr->car;
-      if (tree) {
-        if (tree->car) {            /* positional arguments */
-          n = gen_values(s, tree->car, VAL, (tree->cdr->car)?13:14);
-          if (n < 0) {              /* variable length */
-            n = 15;
-            push();
-          }
-        }
-        if (tree->cdr->car) {       /* keyword arguments */
-          if (n == 13 || n == 14) {
-            pop_n(n);
-            genop_2(s, OP_ARRAY, cursp(), n);
-            push();
-            n = 15;
-          }
-          gen_hash(s, tree->cdr->car->cdr, VAL, 0);
-          if (n < 14) {
-            n++;
-          }
-          else {
-            pop_n(2);
-            genop_2(s, OP_ARYPUSH, cursp(), 1);
-          }
-          push();
-        }
-      }
-      if (rhs) {
-        codegen(s, rhs, VAL);
-        pop();
-      }
-      else {
-        gen_move(s, cursp(), sp, 0);
-      }
-      if (val) {
-        gen_move(s, top, cursp(), 1);
-      }
-      if (n < 15) {
-        n++;
-        if (n == 15) {
-          pop_n(14);
-          genop_2(s, OP_ARRAY, cursp(), 15);
-        }
-      }
-      else {
-        pop();
-        genop_2(s, OP_ARYPUSH, cursp(), 1);
-      }
-      push(); pop();
-      s->sp = call;
-      if (mid == MRB_OPSYM_2(s->mrb, aref) && n == 2) {
-        push_n(4); pop_n(4); /* self + idx + value + (invisible block for OP_SEND) */
-        genop_1(s, OP_SETIDX, cursp());
-      }
-      else {
-        int st = 2 /* self + block */ +
-                 (((n >> 0) & 0x0f) < 15 ? ((n >> 0) & 0x0f)     : 1) +
-                 (((n >> 4) & 0x0f) < 15 ? ((n >> 4) & 0x0f) * 2 : 1);
-        push_n(st); pop_n(st);
-        genop_3(s, noself ? OP_SSEND : OP_SEND, cursp(), new_sym(s, attrsym(s, mid)), n);
-      }
-      if (safe) {
-        dispatch(s, skip);
-      }
-      s->sp = top;
-    }
-    break;
+  //     top = cursp();
+  //     if (val || sp == cursp()) {
+  //       push();                   /* room for retval */
+  //     }
+  //     call = cursp();
+  //     if (!tree->car) {
+  //       noself = 1;
+  //       push();
+  //     }
+  //     else {
+  //       codegen(s, tree->car, VAL); /* receiver */
+  //     }
+  //     if (safe) {
+  //       int recv = cursp()-1;
+  //       gen_move(s, cursp(), recv, 1);
+  //       skip = genjmp2_0(s, OP_JMPNIL, cursp(), val);
+  //     }
+  //     tree = tree->cdr->cdr->car;
+  //     if (tree) {
+  //       if (tree->car) {            /* positional arguments */
+  //         n = gen_values(s, tree->car, VAL, (tree->cdr->car)?13:14);
+  //         if (n < 0) {              /* variable length */
+  //           n = 15;
+  //           push();
+  //         }
+  //       }
+  //       if (tree->cdr->car) {       /* keyword arguments */
+  //         if (n == 13 || n == 14) {
+  //           pop_n(n);
+  //           genop_2(s, OP_ARRAY, cursp(), n);
+  //           push();
+  //           n = 15;
+  //         }
+  //         gen_hash(s, tree->cdr->car->cdr, VAL, 0);
+  //         if (n < 14) {
+  //           n++;
+  //         }
+  //         else {
+  //           pop_n(2);
+  //           genop_2(s, OP_ARYPUSH, cursp(), 1);
+  //         }
+  //         push();
+  //       }
+  //     }
+  //     if (rhs) {
+  //       codegen(s, rhs, VAL);
+  //       pop();
+  //     }
+  //     else {
+  //       gen_move(s, cursp(), sp, 0);
+  //     }
+  //     if (val) {
+  //       gen_move(s, top, cursp(), 1);
+  //     }
+  //     if (n < 15) {
+  //       n++;
+  //       if (n == 15) {
+  //         pop_n(14);
+  //         genop_2(s, OP_ARRAY, cursp(), 15);
+  //       }
+  //     }
+  //     else {
+  //       pop();
+  //       genop_2(s, OP_ARYPUSH, cursp(), 1);
+  //     }
+  //     push(); pop();
+  //     s->sp = call;
+  //     if (mid == MRB_OPSYM_2(s->mrb, aref) && n == 2) {
+  //       push_n(4); pop_n(4); /* self + idx + value + (invisible block for OP_SEND) */
+  //       genop_1(s, OP_SETIDX, cursp());
+  //     }
+  //     else {
+  //       int st = 2 /* self + block */ +
+  //                (((n >> 0) & 0x0f) < 15 ? ((n >> 0) & 0x0f)     : 1) +
+  //                (((n >> 4) & 0x0f) < 15 ? ((n >> 4) & 0x0f) * 2 : 1);
+  //       push_n(st); pop_n(st);
+  //       genop_3(s, noself ? OP_SSEND : OP_SEND, cursp(), new_sym(s, attrsym(s, mid)), n);
+  //     }
+  //     if (safe) {
+  //       dispatch(s, skip);
+  //     }
+  //     s->sp = top;
+  //   }
+  //   break;
 
-  case NODE_MASGN:
-    gen_massignment(s, tree->car, sp, val);
-    break;
+  // case NODE_MASGN:
+  //   gen_massignment(s, tree->car, sp, val);
+  //   break;
 
-  /* splat without assignment */
-  case NODE_NIL:
-    break;
+  // /* splat without assignment */
+  // case NODE_NIL:
+  //   break;
 
   default:
     codegen_error(s, "unknown lhs");
-    break;
+    // break;
   }
   if (val) push();
 }
 
-static void
-gen_massignment(codegen_scope *s, node *tree, int rhs, int val)
-{
-  int n = 0, post = 0;
-  node *t, *p;
+// static void
+// gen_massignment(codegen_scope *s, node *tree, int rhs, int val)
+// {
+//   int n = 0, post = 0;
+//   node *t, *p;
 
-  if (tree->car) {              /* pre */
-    t = tree->car;
-    n = 0;
-    while (t) {
-      int sp = cursp();
+//   if (tree->car) {              /* pre */
+//     t = tree->car;
+//     n = 0;
+//     while (t) {
+//       int sp = cursp();
 
-      genop_3(s, OP_AREF, sp, rhs, n);
-      push();
-      gen_assignment(s, t->car, NULL, sp, NOVAL);
-      pop();
-      n++;
-      t = t->cdr;
-    }
-  }
-  t = tree->cdr;
-  if (t) {
-    if (t->cdr) {               /* post count */
-      p = t->cdr->car;
-      while (p) {
-        post++;
-        p = p->cdr;
-      }
-    }
-    gen_move(s, cursp(), rhs, val);
-    push_n(post+1);
-    pop_n(post+1);
-    genop_3(s, OP_APOST, cursp(), n, post);
-    n = 1;
-    if (t->car && t->car != (node*)-1) { /* rest */
-      gen_assignment(s, t->car, NULL, cursp(), NOVAL);
-    }
-    if (t->cdr && t->cdr->car) {
-      t = t->cdr->car;
-      while (t) {
-        gen_assignment(s, t->car, NULL, cursp()+n, NOVAL);
-        t = t->cdr;
-        n++;
-      }
-    }
-    if (val) {
-      gen_move(s, cursp(), rhs, 0);
-    }
-  }
-}
+//       genop_3(s, OP_AREF, sp, rhs, n);
+//       push();
+//       gen_assignment(s, t->car, NULL, sp, NOVAL);
+//       pop();
+//       n++;
+//       t = t->cdr;
+//     }
+//   }
+//   t = tree->cdr;
+//   if (t) {
+//     if (t->cdr) {               /* post count */
+//       p = t->cdr->car;
+//       while (p) {
+//         post++;
+//         p = p->cdr;
+//       }
+//     }
+//     gen_move(s, cursp(), rhs, val);
+//     push_n(post+1);
+//     pop_n(post+1);
+//     genop_3(s, OP_APOST, cursp(), n, post);
+//     n = 1;
+//     if (t->car && t->car != (node*)-1) { /* rest */
+//       gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+//     }
+//     if (t->cdr && t->cdr->car) {
+//       t = t->cdr->car;
+//       while (t) {
+//         gen_assignment(s, t->car, NULL, cursp()+n, NOVAL);
+//         t = t->cdr;
+//         n++;
+//       }
+//     }
+//     if (val) {
+//       gen_move(s, cursp(), rhs, 0);
+//     }
+//   }
+// }
 
 static void
 gen_intern(codegen_scope *s)
@@ -2151,9 +2367,9 @@ raise_error(codegen_scope *s, const char *msg)
 }
 
 static mrb_int
-readint(codegen_scope *s, const char *p, int base, mrb_bool neg, mrb_bool *overflow)
+readint(codegen_scope *s, const char *p, size_t plen, int base, mrb_bool neg, mrb_bool *overflow)
 {
-  const char *e = p + strlen(p);
+  const char *e = p + plen;
   mrb_int result = 0;
 
   mrb_assert(base >= 2 && base <= 16);
@@ -2254,12 +2470,11 @@ gen_blkmove(codegen_scope *s, uint16_t ainfo, int lv)
 }
 
 static void
-codegen(codegen_scope *s, node *tree, int val)
+codegen(codegen_scope *s, LRP(Node) *node, mrb_bool val)
 {
-  int nt;
   int rlev = s->rlev;
 
-  if (!tree) {
+  if (!node) {
     if (val) {
       genop_1(s, OP_LOADNIL, cursp());
       push();
@@ -2271,466 +2486,451 @@ codegen(codegen_scope *s, node *tree, int val)
   if (s->rlev > MRB_CODEGEN_LEVEL_MAX) {
     codegen_error(s, "too complex expression");
   }
-  if (s->irep && s->filename_index != tree->filename_index) {
-    mrb_sym fname = mrb_parser_get_filename(s->parser, s->filename_index);
-    const char *filename = mrb_sym_name_len(s->mrb, fname, NULL);
+  // if (s->irep && s->filename_index != tree->filename_index) {
+  //   mrb_sym fname = mrb_parser_get_filename(s->parser, s->filename_index);
+  //   const char *filename = mrb_sym_name_len(s->mrb, fname, NULL);
 
-    mrb_debug_info_append_file(s->mrb, s->irep->debug_info,
-                               filename, s->lines, s->debug_start_pos, s->pc);
-    s->debug_start_pos = s->pc;
-    s->filename_index = tree->filename_index;
-    s->filename_sym = mrb_parser_get_filename(s->parser, tree->filename_index);
-  }
+  //   mrb_debug_info_append_file(s->mrb, s->irep->debug_info,
+  //                              filename, s->lines, s->debug_start_pos, s->pc);
+  //   s->debug_start_pos = s->pc;
+  //   s->filename_index = tree->filename_index;
+  //   s->filename_sym = mrb_parser_get_filename(s->parser, tree->filename_index);
+  // }
 
-  nt = nint(tree->car);
-  s->lineno = tree->lineno;
-  tree = tree->cdr;
-  switch (nt) {
-  case NODE_BEGIN:
-    if (val && !tree) {
-      genop_1(s, OP_LOADNIL, cursp());
-      push();
-    }
-    while (tree) {
-      codegen(s, tree->car, tree->cdr ? NOVAL : val);
-      tree = tree->cdr;
-    }
-    break;
-
-  case NODE_RESCUE:
+  // s->lineno = tree->lineno;
+  switch (node->tag) {
+  case LRP(NODE_BEGIN):
     {
-      int noexc;
-      uint32_t exend, pos1, pos2, tmp;
-      struct loopinfo *lp;
-      int catch_entry, begin, end;
-
-      if (tree->car == NULL) goto exit;
-      lp = loop_push(s, LOOP_BEGIN);
-      lp->pc0 = new_label(s);
-      catch_entry = catch_handler_new(s);
-      begin = s->pc;
-      codegen(s, tree->car, VAL);
-      pop();
-      lp->type = LOOP_RESCUE;
-      end = s->pc;
-      noexc = genjmp_0(s, OP_JMP);
-      catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
-      tree = tree->cdr;
-      exend = JMPLINK_START;
-      pos1 = JMPLINK_START;
-      if (tree->car) {
-        node *n2 = tree->car;
-        int exc = cursp();
-
-        genop_1(s, OP_EXCEPT, exc);
-        push();
-        while (n2) {
-          node *n3 = n2->car;
-          node *n4 = n3->car;
-
-          dispatch(s, pos1);
-          pos2 = JMPLINK_START;
-          do {
-            if (n4 && n4->car && nint(n4->car->car) == NODE_SPLAT) {
-              codegen(s, n4->car, VAL);
-              gen_move(s, cursp(), exc, 0);
-              push_n(2); pop_n(2); /* space for one arg and a block */
-              pop();
-              genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, __case_eqq)), 1);
-            }
-            else {
-              if (n4) {
-                codegen(s, n4->car, VAL);
-              }
-              else {
-                genop_2(s, OP_GETCONST, cursp(), new_sym(s, MRB_SYM_2(s->mrb, StandardError)));
-                push();
-              }
-              pop();
-              genop_2(s, OP_RESCUE, exc, cursp());
-            }
-            tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, val);
-            pos2 = tmp;
-            if (n4) {
-              n4 = n4->cdr;
-            }
-          } while (n4);
-          pos1 = genjmp_0(s, OP_JMP);
-          dispatch_linked(s, pos2);
-
-          pop();
-          if (n3->cdr->car) {
-            gen_assignment(s, n3->cdr->car, NULL, exc, NOVAL);
-          }
-          if (n3->cdr->cdr->car) {
-            codegen(s, n3->cdr->cdr->car, val);
-            if (val) pop();
-          }
-          tmp = genjmp(s, OP_JMP, exend);
-          exend = tmp;
-          n2 = n2->cdr;
-          push();
-        }
-        if (pos1 != JMPLINK_START) {
-          dispatch(s, pos1);
-          genop_1(s, OP_RAISEIF, exc);
-        }
-      }
-      pop();
-      tree = tree->cdr;
-      dispatch(s, noexc);
-      if (tree->car) {
-        codegen(s, tree->car, val);
-      }
-      else if (val) {
-        push();
-      }
-      dispatch_linked(s, exend);
-      loop_pop(s, NOVAL);
-    }
-    break;
-
-  case NODE_ENSURE:
-    if (!tree->cdr || !tree->cdr->cdr ||
-        (nint(tree->cdr->cdr->car) == NODE_BEGIN &&
-         tree->cdr->cdr->cdr)) {
-      int catch_entry, begin, end, target;
-      int idx;
-
-      catch_entry = catch_handler_new(s);
-      begin = s->pc;
-      codegen(s, tree->car, val);
-      end = target = s->pc;
-      push();
-      idx = cursp();
-      genop_1(s, OP_EXCEPT, idx);
-      push();
-      codegen(s, tree->cdr->cdr, NOVAL);
-      pop();
-      genop_1(s, OP_RAISEIF, idx);
-      pop();
-      catch_handler_set(s, catch_entry, MRB_CATCH_ENSURE, begin, end, target);
-    }
-    else {                      /* empty ensure ignored */
-      codegen(s, tree->car, val);
-    }
-    break;
-
-  case NODE_LAMBDA:
-    if (val) {
-      int idx = lambda_body(s, tree, 1);
-
-      genop_2(s, OP_LAMBDA, cursp(), idx);
-      push();
-    }
-    break;
-
-  case NODE_BLOCK:
-    if (val) {
-      int idx = lambda_body(s, tree, 1);
-
-      genop_2(s, OP_BLOCK, cursp(), idx);
-      push();
-    }
-    break;
-
-  case NODE_IF:
-    {
-      uint32_t pos1, pos2;
-      mrb_bool nil_p = FALSE;
-      node *elsepart = tree->cdr->cdr->car;
-
-      if (!tree->car) {
-        codegen(s, elsepart, val);
-        goto exit;
-      }
-      if (true_always(tree->car)) {
-        codegen(s, tree->cdr->car, val);
-        goto exit;
-      }
-      if (false_always(tree->car)) {
-        codegen(s, elsepart, val);
-        goto exit;
-      }
-      if (nint(tree->car->car) == NODE_CALL) {
-        node *n = tree->car->cdr;
-        mrb_sym mid = nsym(n->cdr->car);
-        mrb_sym sym_nil_p = MRB_SYM_Q_2(s->mrb, nil);
-        if (mid == sym_nil_p && n->cdr->cdr->car == NULL) {
-          nil_p = TRUE;
-          codegen(s, n->car, VAL);
-        }
-      }
-      if (!nil_p) {
-        codegen(s, tree->car, VAL);
-      }
-      pop();
-      if (val || tree->cdr->car) {
-        if (nil_p) {
-          pos2 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
-          pos1 = genjmp_0(s, OP_JMP);
-          dispatch(s, pos2);
-        }
-        else {
-          pos1 = genjmp2_0(s, OP_JMPNOT, cursp(), val);
-        }
-        codegen(s, tree->cdr->car, val);
-        if (val) pop();
-        if (elsepart || val) {
-          pos2 = genjmp_0(s, OP_JMP);
-          dispatch(s, pos1);
-          codegen(s, elsepart, val);
-          dispatch(s, pos2);
-        }
-        else {
-          dispatch(s, pos1);
-        }
-      }
-      else {                    /* empty then-part */
-        if (elsepart) {
-          if (nil_p) {
-            pos1 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
-          }
-          else {
-            pos1 = genjmp2_0(s, OP_JMPIF, cursp(), val);
-          }
-          codegen(s, elsepart, val);
-          dispatch(s, pos1);
-        }
-        else if (val && !nil_p) {
-          genop_1(s, OP_LOADNIL, cursp());
-          push();
-        }
-      }
-    }
-    break;
-
-  case NODE_AND:
-    {
-      uint32_t pos;
-
-      if (true_always(tree->car)) {
-        codegen(s, tree->cdr, val);
-        goto exit;
-      }
-      if (false_always(tree->car)) {
-        codegen(s, tree->car, val);
-        goto exit;
-      }
-      codegen(s, tree->car, VAL);
-      pop();
-      pos = genjmp2_0(s, OP_JMPNOT, cursp(), val);
-      codegen(s, tree->cdr, val);
-      dispatch(s, pos);
-    }
-    break;
-
-  case NODE_OR:
-    {
-      uint32_t pos;
-
-      if (true_always(tree->car)) {
-        codegen(s, tree->car, val);
-        goto exit;
-      }
-      if (false_always(tree->car)) {
-        codegen(s, tree->cdr, val);
-        goto exit;
-      }
-      codegen(s, tree->car, VAL);
-      pop();
-      pos = genjmp2_0(s, OP_JMPIF, cursp(), val);
-      codegen(s, tree->cdr, val);
-      dispatch(s, pos);
-    }
-    break;
-
-  case NODE_WHILE:
-  case NODE_UNTIL:
-    {
-      if (true_always(tree->car)) {
-        if (nt == NODE_UNTIL) {
-          if (val) {
-            genop_1(s, OP_LOADNIL, cursp());
-            push();
-          }
-          goto exit;
-        }
-      }
-      else if (false_always(tree->car)) {
-        if (nt == NODE_WHILE) {
-          if (val) {
-            genop_1(s, OP_LOADNIL, cursp());
-            push();
-          }
-          goto exit;
-        }
-      }
-
-      uint32_t pos = JMPLINK_START;
-      struct loopinfo *lp = loop_push(s, LOOP_NORMAL);
-
-      if (!val) lp->reg = -1;
-      lp->pc0 = new_label(s);
-      codegen(s, tree->car, VAL);
-      pop();
-      if (nt == NODE_WHILE) {
-        pos = genjmp2_0(s, OP_JMPNOT, cursp(), NOVAL);
-      }
-      else {
-        pos = genjmp2_0(s, OP_JMPIF, cursp(), NOVAL);
-      }
-      lp->pc1 = new_label(s);
-      codegen(s, tree->cdr, NOVAL);
-      genjmp(s, OP_JMP, lp->pc0);
-      dispatch(s, pos);
-      loop_pop(s, val);
-    }
-    break;
-
-  case NODE_FOR:
-    for_body(s, tree);
-    if (val) push();
-    break;
-
-  case NODE_CASE:
-    {
-      int head = 0;
-      uint32_t pos1, pos2, pos3, tmp;
-      node *n;
-
-      pos3 = JMPLINK_START;
-      if (tree->car) {
-        head = cursp();
-        codegen(s, tree->car, VAL);
-      }
-      tree = tree->cdr;
-      while (tree) {
-        n = tree->car->car;
-        pos1 = pos2 = JMPLINK_START;
-        while (n) {
-          codegen(s, n->car, VAL);
-          if (head) {
-            gen_move(s, cursp(), head, 0);
-            push(); push(); pop(); pop(); pop();
-            if (nint(n->car->car) == NODE_SPLAT) {
-              genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, __case_eqq)), 1);
-            }
-            else {
-              genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_OPSYM_2(s->mrb, eqq)), 1);
-            }
-          }
-          else {
-            pop();
-          }
-          tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, NOVAL);
-          pos2 = tmp;
-          n = n->cdr;
-        }
-        if (tree->car->car) {
-          pos1 = genjmp_0(s, OP_JMP);
-          dispatch_linked(s, pos2);
-        }
-        codegen(s, tree->car->cdr, val);
-        if (val) pop();
-        tmp = genjmp(s, OP_JMP, pos3);
-        pos3 = tmp;
-        dispatch(s, pos1);
-        tree = tree->cdr;
-      }
-      if (val) {
-        uint32_t pos = cursp();
+      LRP(NodeList) statements = node->as.begin.statements;
+      if (val && !statements.len) {
         genop_1(s, OP_LOADNIL, cursp());
-        if (pos3 != JMPLINK_START) dispatch_linked(s, pos3);
-        if (head) pop();
-        if (cursp() != pos) {
-          gen_move(s, cursp(), pos, 0);
-        }
         push();
       }
-      else {
-        if (pos3 != JMPLINK_START) {
-          dispatch_linked(s, pos3);
-        }
-        if (head) {
-          pop();
-        }
+      for (size_t i = 0; i < statements.len; i++) {
+        codegen(s, statements.ptr + i, i + 1 < statements.len ? NOVAL : val);
       }
+      break;
     }
-    break;
 
-  case NODE_SCOPE:
-    scope_body(s, tree, NOVAL);
-    break;
+//   case NODE_RESCUE:
+//     {
+//       int noexc;
+//       uint32_t exend, pos1, pos2, tmp;
+//       struct loopinfo *lp;
+//       int catch_entry, begin, end;
 
-  case NODE_FCALL:
-  case NODE_CALL:
-    gen_call(s, tree, val, 0);
-    break;
-  case NODE_SCALL:
-    gen_call(s, tree, val, 1);
-    break;
+//       if (tree->car == NULL) goto exit;
+//       lp = loop_push(s, LOOP_BEGIN);
+//       lp->pc0 = new_label(s);
+//       catch_entry = catch_handler_new(s);
+//       begin = s->pc;
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       lp->type = LOOP_RESCUE;
+//       end = s->pc;
+//       noexc = genjmp_0(s, OP_JMP);
+//       catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
+//       tree = tree->cdr;
+//       exend = JMPLINK_START;
+//       pos1 = JMPLINK_START;
+//       if (tree->car) {
+//         node *n2 = tree->car;
+//         int exc = cursp();
 
-  case NODE_DOT2:
-    codegen(s, tree->car, val);
-    codegen(s, tree->cdr, val);
-    if (val) {
-      pop(); pop();
-      genop_1(s, OP_RANGE_INC, cursp());
-      push();
-    }
-    break;
+//         genop_1(s, OP_EXCEPT, exc);
+//         push();
+//         while (n2) {
+//           node *n3 = n2->car;
+//           node *n4 = n3->car;
 
-  case NODE_DOT3:
-    codegen(s, tree->car, val);
-    codegen(s, tree->cdr, val);
-    if (val) {
-      pop(); pop();
-      genop_1(s, OP_RANGE_EXC, cursp());
-      push();
-    }
-    break;
+//           dispatch(s, pos1);
+//           pos2 = JMPLINK_START;
+//           do {
+//             if (n4 && n4->car && nint(n4->car->car) == NODE_SPLAT) {
+//               codegen(s, n4->car, VAL);
+//               gen_move(s, cursp(), exc, 0);
+//               push_n(2); pop_n(2); /* space for one arg and a block */
+//               pop();
+//               genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, __case_eqq)), 1);
+//             }
+//             else {
+//               if (n4) {
+//                 codegen(s, n4->car, VAL);
+//               }
+//               else {
+//                 genop_2(s, OP_GETCONST, cursp(), new_sym(s, MRB_SYM_2(s->mrb, StandardError)));
+//                 push();
+//               }
+//               pop();
+//               genop_2(s, OP_RESCUE, exc, cursp());
+//             }
+//             tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, val);
+//             pos2 = tmp;
+//             if (n4) {
+//               n4 = n4->cdr;
+//             }
+//           } while (n4);
+//           pos1 = genjmp_0(s, OP_JMP);
+//           dispatch_linked(s, pos2);
 
-  case NODE_COLON2:
+//           pop();
+//           if (n3->cdr->car) {
+//             gen_assignment(s, n3->cdr->car, NULL, exc, NOVAL);
+//           }
+//           if (n3->cdr->cdr->car) {
+//             codegen(s, n3->cdr->cdr->car, val);
+//             if (val) pop();
+//           }
+//           tmp = genjmp(s, OP_JMP, exend);
+//           exend = tmp;
+//           n2 = n2->cdr;
+//           push();
+//         }
+//         if (pos1 != JMPLINK_START) {
+//           dispatch(s, pos1);
+//           genop_1(s, OP_RAISEIF, exc);
+//         }
+//       }
+//       pop();
+//       tree = tree->cdr;
+//       dispatch(s, noexc);
+//       if (tree->car) {
+//         codegen(s, tree->car, val);
+//       }
+//       else if (val) {
+//         push();
+//       }
+//       dispatch_linked(s, exend);
+//       loop_pop(s, NOVAL);
+//     }
+//     break;
+
+//   case NODE_ENSURE:
+//     if (!tree->cdr || !tree->cdr->cdr ||
+//         (nint(tree->cdr->cdr->car) == NODE_BEGIN &&
+//          tree->cdr->cdr->cdr)) {
+//       int catch_entry, begin, end, target;
+//       int idx;
+
+//       catch_entry = catch_handler_new(s);
+//       begin = s->pc;
+//       codegen(s, tree->car, val);
+//       end = target = s->pc;
+//       push();
+//       idx = cursp();
+//       genop_1(s, OP_EXCEPT, idx);
+//       push();
+//       codegen(s, tree->cdr->cdr, NOVAL);
+//       pop();
+//       genop_1(s, OP_RAISEIF, idx);
+//       pop();
+//       catch_handler_set(s, catch_entry, MRB_CATCH_ENSURE, begin, end, target);
+//     }
+//     else {                      /* empty ensure ignored */
+//       codegen(s, tree->car, val);
+//     }
+//     break;
+
+  case LRP(NODE_BLOCK):
     {
-      int sym = new_sym(s, nsym(tree->cdr));
-
-      codegen(s, tree->car, VAL);
-      pop();
-      genop_2(s, OP_GETMCNST, cursp(), sym);
-      if (val) push();
+      LRP(Block) block = node->as.block;
+      gen_call(s, block.call, &block, val);
+      break;
     }
+
+//   case NODE_IF:
+//     {
+//       uint32_t pos1, pos2;
+//       mrb_bool nil_p = FALSE;
+//       node *elsepart = tree->cdr->cdr->car;
+
+//       if (!tree->car) {
+//         codegen(s, elsepart, val);
+//         goto exit;
+//       }
+//       if (true_always(tree->car)) {
+//         codegen(s, tree->cdr->car, val);
+//         goto exit;
+//       }
+//       if (false_always(tree->car)) {
+//         codegen(s, elsepart, val);
+//         goto exit;
+//       }
+//       if (nint(tree->car->car) == NODE_CALL) {
+//         node *n = tree->car->cdr;
+//         mrb_sym mid = nsym(n->cdr->car);
+//         mrb_sym sym_nil_p = MRB_SYM_Q_2(s->mrb, nil);
+//         if (mid == sym_nil_p && n->cdr->cdr->car == NULL) {
+//           nil_p = TRUE;
+//           codegen(s, n->car, VAL);
+//         }
+//       }
+//       if (!nil_p) {
+//         codegen(s, tree->car, VAL);
+//       }
+//       pop();
+//       if (val || tree->cdr->car) {
+//         if (nil_p) {
+//           pos2 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
+//           pos1 = genjmp_0(s, OP_JMP);
+//           dispatch(s, pos2);
+//         }
+//         else {
+//           pos1 = genjmp2_0(s, OP_JMPNOT, cursp(), val);
+//         }
+//         codegen(s, tree->cdr->car, val);
+//         if (val) pop();
+//         if (elsepart || val) {
+//           pos2 = genjmp_0(s, OP_JMP);
+//           dispatch(s, pos1);
+//           codegen(s, elsepart, val);
+//           dispatch(s, pos2);
+//         }
+//         else {
+//           dispatch(s, pos1);
+//         }
+//       }
+//       else {                    /* empty then-part */
+//         if (elsepart) {
+//           if (nil_p) {
+//             pos1 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
+//           }
+//           else {
+//             pos1 = genjmp2_0(s, OP_JMPIF, cursp(), val);
+//           }
+//           codegen(s, elsepart, val);
+//           dispatch(s, pos1);
+//         }
+//         else if (val && !nil_p) {
+//           genop_1(s, OP_LOADNIL, cursp());
+//           push();
+//         }
+//       }
+//     }
+//     break;
+
+//   case NODE_AND:
+//     {
+//       uint32_t pos;
+
+//       if (true_always(tree->car)) {
+//         codegen(s, tree->cdr, val);
+//         goto exit;
+//       }
+//       if (false_always(tree->car)) {
+//         codegen(s, tree->car, val);
+//         goto exit;
+//       }
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       pos = genjmp2_0(s, OP_JMPNOT, cursp(), val);
+//       codegen(s, tree->cdr, val);
+//       dispatch(s, pos);
+//     }
+//     break;
+
+//   case NODE_OR:
+//     {
+//       uint32_t pos;
+
+//       if (true_always(tree->car)) {
+//         codegen(s, tree->car, val);
+//         goto exit;
+//       }
+//       if (false_always(tree->car)) {
+//         codegen(s, tree->cdr, val);
+//         goto exit;
+//       }
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       pos = genjmp2_0(s, OP_JMPIF, cursp(), val);
+//       codegen(s, tree->cdr, val);
+//       dispatch(s, pos);
+//     }
+//     break;
+
+//   case NODE_WHILE:
+//   case NODE_UNTIL:
+//     {
+//       if (true_always(tree->car)) {
+//         if (nt == NODE_UNTIL) {
+//           if (val) {
+//             genop_1(s, OP_LOADNIL, cursp());
+//             push();
+//           }
+//           goto exit;
+//         }
+//       }
+//       else if (false_always(tree->car)) {
+//         if (nt == NODE_WHILE) {
+//           if (val) {
+//             genop_1(s, OP_LOADNIL, cursp());
+//             push();
+//           }
+//           goto exit;
+//         }
+//       }
+
+//       uint32_t pos = JMPLINK_START;
+//       struct loopinfo *lp = loop_push(s, LOOP_NORMAL);
+
+//       if (!val) lp->reg = -1;
+//       lp->pc0 = new_label(s);
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       if (nt == NODE_WHILE) {
+//         pos = genjmp2_0(s, OP_JMPNOT, cursp(), NOVAL);
+//       }
+//       else {
+//         pos = genjmp2_0(s, OP_JMPIF, cursp(), NOVAL);
+//       }
+//       lp->pc1 = new_label(s);
+//       codegen(s, tree->cdr, NOVAL);
+//       genjmp(s, OP_JMP, lp->pc0);
+//       dispatch(s, pos);
+//       loop_pop(s, val);
+//     }
+//     break;
+
+//   case NODE_FOR:
+//     for_body(s, tree);
+//     if (val) push();
+//     break;
+
+//   case NODE_CASE:
+//     {
+//       int head = 0;
+//       uint32_t pos1, pos2, pos3, tmp;
+//       node *n;
+
+//       pos3 = JMPLINK_START;
+//       if (tree->car) {
+//         head = cursp();
+//         codegen(s, tree->car, VAL);
+//       }
+//       tree = tree->cdr;
+//       while (tree) {
+//         n = tree->car->car;
+//         pos1 = pos2 = JMPLINK_START;
+//         while (n) {
+//           codegen(s, n->car, VAL);
+//           if (head) {
+//             gen_move(s, cursp(), head, 0);
+//             push(); push(); pop(); pop(); pop();
+//             if (nint(n->car->car) == NODE_SPLAT) {
+//               genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, __case_eqq)), 1);
+//             }
+//             else {
+//               genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_OPSYM_2(s->mrb, eqq)), 1);
+//             }
+//           }
+//           else {
+//             pop();
+//           }
+//           tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, NOVAL);
+//           pos2 = tmp;
+//           n = n->cdr;
+//         }
+//         if (tree->car->car) {
+//           pos1 = genjmp_0(s, OP_JMP);
+//           dispatch_linked(s, pos2);
+//         }
+//         codegen(s, tree->car->cdr, val);
+//         if (val) pop();
+//         tmp = genjmp(s, OP_JMP, pos3);
+//         pos3 = tmp;
+//         dispatch(s, pos1);
+//         tree = tree->cdr;
+//       }
+//       if (val) {
+//         uint32_t pos = cursp();
+//         genop_1(s, OP_LOADNIL, cursp());
+//         if (pos3 != JMPLINK_START) dispatch_linked(s, pos3);
+//         if (head) pop();
+//         if (cursp() != pos) {
+//           gen_move(s, cursp(), pos, 0);
+//         }
+//         push();
+//       }
+//       else {
+//         if (pos3 != JMPLINK_START) {
+//           dispatch_linked(s, pos3);
+//         }
+//         if (head) {
+//           pop();
+//         }
+//       }
+//     }
+//     break;
+
+//   case NODE_SCOPE:
+//     scope_body(s, tree, NOVAL);
+//     break;
+
+  case LRP(NODE_SEND):
+  case LRP(NODE_C_SEND):
+    gen_call(s, node, NULL, val);
     break;
 
-  case NODE_COLON3:
+//   case NODE_DOT2:
+//     codegen(s, tree->car, val);
+//     codegen(s, tree->cdr, val);
+//     if (val) {
+//       pop(); pop();
+//       genop_1(s, OP_RANGE_INC, cursp());
+//       push();
+//     }
+//     break;
+
+//   case NODE_DOT3:
+//     codegen(s, tree->car, val);
+//     codegen(s, tree->cdr, val);
+//     if (val) {
+//       pop(); pop();
+//       genop_1(s, OP_RANGE_EXC, cursp());
+//       push();
+//     }
+//     break;
+
+//   case NODE_COLON2:
+//     {
+//       int sym = new_sym(s, nsym(tree->cdr));
+
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       genop_2(s, OP_GETMCNST, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_COLON3:
+//     {
+//       int sym = new_sym(s, nsym(tree));
+
+//       genop_1(s, OP_OCLASS, cursp());
+//       genop_2(s, OP_GETMCNST, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_ARRAY:
+//     {
+//       int n;
+
+//       n = gen_values(s, tree, val, 0);
+//       if (val) {
+//         if (n >= 0) {
+//           pop_n(n);
+//           genop_2(s, OP_ARRAY, cursp(), n);
+//         }
+//         push();
+//       }
+//     }
+//     break;
+
+  case LRP(NODE_HASH):
     {
-      int sym = new_sym(s, nsym(tree));
-
-      genop_1(s, OP_OCLASS, cursp());
-      genop_2(s, OP_GETMCNST, cursp(), sym);
-      if (val) push();
-    }
-    break;
-
-  case NODE_ARRAY:
-    {
-      int n;
-
-      n = gen_values(s, tree, val, 0);
-      if (val) {
-        if (n >= 0) {
-          pop_n(n);
-          genop_2(s, OP_ARRAY, cursp(), n);
-        }
-        push();
-      }
-    }
-    break;
-
-  case NODE_HASH:
-  case NODE_KW_HASH:
-    {
-      int nk = gen_hash(s, tree, val, GEN_LIT_ARY_MAX);
+      int nk = gen_hash(s, node->as.hash.pairs, val, GEN_LIT_ARY_MAX);
       if (val && nk >= 0) {
         pop_n(nk*2);
         genop_2(s, OP_HASH, cursp(), nk);
@@ -2739,576 +2939,578 @@ codegen(codegen_scope *s, node *tree, int val)
     }
     break;
 
-  case NODE_SPLAT:
-    codegen(s, tree, val);
+//   case NODE_SPLAT:
+//     codegen(s, tree, val);
+//     break;
+
+  case LRP(NODE_LVASGN):
+    gen_assignment(s, node, 0, val);
     break;
 
-  case NODE_ASGN:
-    gen_assignment(s, tree->car, tree->cdr, 0, val);
-    break;
+//   case NODE_MASGN:
+//     {
+//       int len = 0, n = 0, post = 0;
+//       node *t = tree->cdr, *p;
+//       int rhs = cursp();
 
-  case NODE_MASGN:
-    {
-      int len = 0, n = 0, post = 0;
-      node *t = tree->cdr, *p;
-      int rhs = cursp();
+//       if (nint(t->car) == NODE_ARRAY && t->cdr && nosplat(t->cdr)) {
+//         /* fixed rhs */
+//         t = t->cdr;
+//         while (t) {
+//           codegen(s, t->car, VAL);
+//           len++;
+//           t = t->cdr;
+//         }
+//         tree = tree->car;
+//         if (tree->car) {                /* pre */
+//           t = tree->car;
+//           n = 0;
+//           while (t) {
+//             if (n < len) {
+//               gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+//               n++;
+//             }
+//             else {
+//               genop_1(s, OP_LOADNIL, rhs+n);
+//               gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+//             }
+//             t = t->cdr;
+//           }
+//         }
+//         t = tree->cdr;
+//         if (t) {
+//           if (t->cdr) {         /* post count */
+//             p = t->cdr->car;
+//             while (p) {
+//               post++;
+//               p = p->cdr;
+//             }
+//           }
+//           if (t->car) {         /* rest (len - pre - post) */
+//             int rn;
 
-      if (nint(t->car) == NODE_ARRAY && t->cdr && nosplat(t->cdr)) {
-        /* fixed rhs */
-        t = t->cdr;
-        while (t) {
-          codegen(s, t->car, VAL);
-          len++;
-          t = t->cdr;
-        }
-        tree = tree->car;
-        if (tree->car) {                /* pre */
-          t = tree->car;
-          n = 0;
-          while (t) {
-            if (n < len) {
-              gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
-              n++;
-            }
-            else {
-              genop_1(s, OP_LOADNIL, rhs+n);
-              gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
-            }
-            t = t->cdr;
-          }
-        }
-        t = tree->cdr;
-        if (t) {
-          if (t->cdr) {         /* post count */
-            p = t->cdr->car;
-            while (p) {
-              post++;
-              p = p->cdr;
-            }
-          }
-          if (t->car) {         /* rest (len - pre - post) */
-            int rn;
+//             if (len < post + n) {
+//               rn = 0;
+//             }
+//             else {
+//               rn = len - post - n;
+//             }
+//             if (cursp() == rhs+n) {
+//               genop_2(s, OP_ARRAY, cursp(), rn);
+//             }
+//             else {
+//               genop_3(s, OP_ARRAY2, cursp(), rhs+n, rn);
+//             }
+//             gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+//             n += rn;
+//           }
+//           if (t->cdr && t->cdr->car) {
+//             t = t->cdr->car;
+//             while (t) {
+//               if (n<len) {
+//                 gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+//               }
+//               else {
+//                 genop_1(s, OP_LOADNIL, cursp());
+//                 gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+//               }
+//               t = t->cdr;
+//               n++;
+//             }
+//           }
+//         }
+//         pop_n(len);
+//         if (val) {
+//           genop_2(s, OP_ARRAY, rhs, len);
+//           push();
+//         }
+//       }
+//       else {
+//         /* variable rhs */
+//         codegen(s, t, VAL);
+//         gen_massignment(s, tree->car, rhs, val);
+//         if (!val) {
+//           pop();
+//         }
+//       }
+//     }
+//     break;
 
-            if (len < post + n) {
-              rn = 0;
-            }
-            else {
-              rn = len - post - n;
-            }
-            if (cursp() == rhs+n) {
-              genop_2(s, OP_ARRAY, cursp(), rn);
-            }
-            else {
-              genop_3(s, OP_ARRAY2, cursp(), rhs+n, rn);
-            }
-            gen_assignment(s, t->car, NULL, cursp(), NOVAL);
-            n += rn;
-          }
-          if (t->cdr && t->cdr->car) {
-            t = t->cdr->car;
-            while (t) {
-              if (n<len) {
-                gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
-              }
-              else {
-                genop_1(s, OP_LOADNIL, cursp());
-                gen_assignment(s, t->car, NULL, cursp(), NOVAL);
-              }
-              t = t->cdr;
-              n++;
-            }
-          }
-        }
-        pop_n(len);
-        if (val) {
-          genop_2(s, OP_ARRAY, rhs, len);
-          push();
-        }
-      }
-      else {
-        /* variable rhs */
-        codegen(s, t, VAL);
-        gen_massignment(s, tree->car, rhs, val);
-        if (!val) {
-          pop();
-        }
-      }
-    }
-    break;
+//   case NODE_OP_ASGN:
+//     {
+//       mrb_sym sym = nsym(tree->cdr->car);
+//       mrb_int len;
+//       const char *name = mrb_sym_name_len(s->mrb, sym, &len);
+//       int idx, callargs = -1, vsp = -1;
 
-  case NODE_OP_ASGN:
-    {
-      mrb_sym sym = nsym(tree->cdr->car);
-      mrb_int len;
-      const char *name = mrb_sym_name_len(s->mrb, sym, &len);
-      int idx, callargs = -1, vsp = -1;
+//       if ((len == 2 && name[0] == '|' && name[1] == '|') &&
+//           (nint(tree->car->car) == NODE_CONST ||
+//            nint(tree->car->car) == NODE_CVAR)) {
+//         int catch_entry, begin, end;
+//         int noexc, exc;
+//         struct loopinfo *lp;
 
-      if ((len == 2 && name[0] == '|' && name[1] == '|') &&
-          (nint(tree->car->car) == NODE_CONST ||
-           nint(tree->car->car) == NODE_CVAR)) {
-        int catch_entry, begin, end;
-        int noexc, exc;
-        struct loopinfo *lp;
+//         lp = loop_push(s, LOOP_BEGIN);
+//         lp->pc0 = new_label(s);
+//         catch_entry = catch_handler_new(s);
+//         begin = s->pc;
+//         exc = cursp();
+//         codegen(s, tree->car, VAL);
+//         end = s->pc;
+//         noexc = genjmp_0(s, OP_JMP);
+//         lp->type = LOOP_RESCUE;
+//         catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
+//         genop_1(s, OP_EXCEPT, exc);
+//         genop_1(s, OP_LOADF, exc);
+//         dispatch(s, noexc);
+//         loop_pop(s, NOVAL);
+//       }
+//       else if (nint(tree->car->car) == NODE_CALL) {
+//         node *n = tree->car->cdr;
+//         int base, i, nargs = 0;
+//         callargs = 0;
 
-        lp = loop_push(s, LOOP_BEGIN);
-        lp->pc0 = new_label(s);
-        catch_entry = catch_handler_new(s);
-        begin = s->pc;
-        exc = cursp();
-        codegen(s, tree->car, VAL);
-        end = s->pc;
-        noexc = genjmp_0(s, OP_JMP);
-        lp->type = LOOP_RESCUE;
-        catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
-        genop_1(s, OP_EXCEPT, exc);
-        genop_1(s, OP_LOADF, exc);
-        dispatch(s, noexc);
-        loop_pop(s, NOVAL);
-      }
-      else if (nint(tree->car->car) == NODE_CALL) {
-        node *n = tree->car->cdr;
-        int base, i, nargs = 0;
-        callargs = 0;
+//         if (val) {
+//           vsp = cursp();
+//           push();
+//         }
+//         codegen(s, n->car, VAL);   /* receiver */
+//         idx = new_sym(s, nsym(n->cdr->car));
+//         base = cursp()-1;
+//         if (n->cdr->cdr->car) {
+//           nargs = gen_values(s, n->cdr->cdr->car->car, VAL, 13);
+//           if (nargs >= 0) {
+//             callargs = nargs;
+//           }
+//           else { /* varargs */
+//             push();
+//             nargs = 1;
+//             callargs = CALL_MAXARGS;
+//           }
+//         }
+//         /* copy receiver and arguments */
+//         gen_move(s, cursp(), base, 1);
+//         for (i=0; i<nargs; i++) {
+//           gen_move(s, cursp()+i+1, base+i+1, 1);
+//         }
+//         push_n(nargs+2);pop_n(nargs+2); /* space for receiver, arguments and a block */
+//         genop_3(s, OP_SEND, cursp(), idx, callargs);
+//         push();
+//       }
+//       else {
+//         codegen(s, tree->car, VAL);
+//       }
+//       if (len == 2 &&
+//           ((name[0] == '|' && name[1] == '|') ||
+//            (name[0] == '&' && name[1] == '&'))) {
+//         uint32_t pos;
 
-        if (val) {
-          vsp = cursp();
-          push();
-        }
-        codegen(s, n->car, VAL);   /* receiver */
-        idx = new_sym(s, nsym(n->cdr->car));
-        base = cursp()-1;
-        if (n->cdr->cdr->car) {
-          nargs = gen_values(s, n->cdr->cdr->car->car, VAL, 13);
-          if (nargs >= 0) {
-            callargs = nargs;
-          }
-          else { /* varargs */
-            push();
-            nargs = 1;
-            callargs = CALL_MAXARGS;
-          }
-        }
-        /* copy receiver and arguments */
-        gen_move(s, cursp(), base, 1);
-        for (i=0; i<nargs; i++) {
-          gen_move(s, cursp()+i+1, base+i+1, 1);
-        }
-        push_n(nargs+2);pop_n(nargs+2); /* space for receiver, arguments and a block */
-        genop_3(s, OP_SEND, cursp(), idx, callargs);
-        push();
-      }
-      else {
-        codegen(s, tree->car, VAL);
-      }
-      if (len == 2 &&
-          ((name[0] == '|' && name[1] == '|') ||
-           (name[0] == '&' && name[1] == '&'))) {
-        uint32_t pos;
+//         pop();
+//         if (val) {
+//           if (vsp >= 0) {
+//             gen_move(s, vsp, cursp(), 1);
+//           }
+//           pos = genjmp2_0(s, name[0]=='|'?OP_JMPIF:OP_JMPNOT, cursp(), val);
+//         }
+//         else {
+//           pos = genjmp2_0(s, name[0]=='|'?OP_JMPIF:OP_JMPNOT, cursp(), val);
+//         }
+//         codegen(s, tree->cdr->cdr->car, VAL);
+//         pop();
+//         if (val && vsp >= 0) {
+//           gen_move(s, vsp, cursp(), 1);
+//         }
+//         if (nint(tree->car->car) == NODE_CALL) {
+//           if (callargs == CALL_MAXARGS) {
+//             pop();
+//             genop_2(s, OP_ARYPUSH, cursp(), 1);
+//           }
+//           else {
+//             pop_n(callargs);
+//             callargs++;
+//           }
+//           pop();
+//           idx = new_sym(s, attrsym(s, nsym(tree->car->cdr->cdr->car)));
+//           genop_3(s, OP_SEND, cursp(), idx, callargs);
+//         }
+//         else {
+//           gen_assignment(s, tree->car, NULL, cursp(), val);
+//         }
+//         dispatch(s, pos);
+//         goto exit;
+//       }
+//       codegen(s, tree->cdr->cdr->car, VAL);
+//       push(); pop();
+//       pop(); pop();
 
-        pop();
-        if (val) {
-          if (vsp >= 0) {
-            gen_move(s, vsp, cursp(), 1);
-          }
-          pos = genjmp2_0(s, name[0]=='|'?OP_JMPIF:OP_JMPNOT, cursp(), val);
-        }
-        else {
-          pos = genjmp2_0(s, name[0]=='|'?OP_JMPIF:OP_JMPNOT, cursp(), val);
-        }
-        codegen(s, tree->cdr->cdr->car, VAL);
-        pop();
-        if (val && vsp >= 0) {
-          gen_move(s, vsp, cursp(), 1);
-        }
-        if (nint(tree->car->car) == NODE_CALL) {
-          if (callargs == CALL_MAXARGS) {
-            pop();
-            genop_2(s, OP_ARYPUSH, cursp(), 1);
-          }
-          else {
-            pop_n(callargs);
-            callargs++;
-          }
-          pop();
-          idx = new_sym(s, attrsym(s, nsym(tree->car->cdr->cdr->car)));
-          genop_3(s, OP_SEND, cursp(), idx, callargs);
-        }
-        else {
-          gen_assignment(s, tree->car, NULL, cursp(), val);
-        }
-        dispatch(s, pos);
-        goto exit;
-      }
-      codegen(s, tree->cdr->cdr->car, VAL);
-      push(); pop();
-      pop(); pop();
+//       if (len == 1 && name[0] == '+')  {
+//         gen_addsub(s, OP_ADD, cursp());
+//       }
+//       else if (len == 1 && name[0] == '-')  {
+//         gen_addsub(s, OP_SUB, cursp());
+//       }
+//       else if (len == 1 && name[0] == '*')  {
+//         genop_1(s, OP_MUL, cursp());
+//       }
+//       else if (len == 1 && name[0] == '/')  {
+//         genop_1(s, OP_DIV, cursp());
+//       }
+//       else if (len == 1 && name[0] == '<')  {
+//         genop_1(s, OP_LT, cursp());
+//       }
+//       else if (len == 2 && name[0] == '<' && name[1] == '=')  {
+//         genop_1(s, OP_LE, cursp());
+//       }
+//       else if (len == 1 && name[0] == '>')  {
+//         genop_1(s, OP_GT, cursp());
+//       }
+//       else if (len == 2 && name[0] == '>' && name[1] == '=')  {
+//         genop_1(s, OP_GE, cursp());
+//       }
+//       else {
+//         idx = new_sym(s, sym);
+//         genop_3(s, OP_SEND, cursp(), idx, 1);
+//       }
+//       if (callargs < 0) {
+//         gen_assignment(s, tree->car, NULL, cursp(), val);
+//       }
+//       else {
+//         if (val && vsp >= 0) {
+//           gen_move(s, vsp, cursp(), 0);
+//         }
+//         if (callargs == CALL_MAXARGS) {
+//           pop();
+//           genop_2(s, OP_ARYPUSH, cursp(), 1);
+//         }
+//         else {
+//           pop_n(callargs);
+//           callargs++;
+//         }
+//         pop();
+//         idx = new_sym(s, attrsym(s,nsym(tree->car->cdr->cdr->car)));
+//         genop_3(s, OP_SEND, cursp(), idx, callargs);
+//       }
+//     }
+//     break;
 
-      if (len == 1 && name[0] == '+')  {
-        gen_addsub(s, OP_ADD, cursp());
-      }
-      else if (len == 1 && name[0] == '-')  {
-        gen_addsub(s, OP_SUB, cursp());
-      }
-      else if (len == 1 && name[0] == '*')  {
-        genop_1(s, OP_MUL, cursp());
-      }
-      else if (len == 1 && name[0] == '/')  {
-        genop_1(s, OP_DIV, cursp());
-      }
-      else if (len == 1 && name[0] == '<')  {
-        genop_1(s, OP_LT, cursp());
-      }
-      else if (len == 2 && name[0] == '<' && name[1] == '=')  {
-        genop_1(s, OP_LE, cursp());
-      }
-      else if (len == 1 && name[0] == '>')  {
-        genop_1(s, OP_GT, cursp());
-      }
-      else if (len == 2 && name[0] == '>' && name[1] == '=')  {
-        genop_1(s, OP_GE, cursp());
-      }
-      else {
-        idx = new_sym(s, sym);
-        genop_3(s, OP_SEND, cursp(), idx, 1);
-      }
-      if (callargs < 0) {
-        gen_assignment(s, tree->car, NULL, cursp(), val);
-      }
-      else {
-        if (val && vsp >= 0) {
-          gen_move(s, vsp, cursp(), 0);
-        }
-        if (callargs == CALL_MAXARGS) {
-          pop();
-          genop_2(s, OP_ARYPUSH, cursp(), 1);
-        }
-        else {
-          pop_n(callargs);
-          callargs++;
-        }
-        pop();
-        idx = new_sym(s, attrsym(s,nsym(tree->car->cdr->cdr->car)));
-        genop_3(s, OP_SEND, cursp(), idx, callargs);
-      }
-    }
-    break;
+//   case NODE_SUPER:
+//     {
+//       codegen_scope *s2 = s;
+//       int lv = 0;
+//       int n = 0, nk = 0, st = 0;
 
-  case NODE_SUPER:
-    {
-      codegen_scope *s2 = s;
-      int lv = 0;
-      int n = 0, nk = 0, st = 0;
+//       push();
+//       while (!s2->mscope) {
+//         lv++;
+//         s2 = s2->prev;
+//         if (!s2) break;
+//       }
+//       if (tree) {
+//         node *args = tree->car;
+//         if (args) {
+//           st = n = gen_values(s, args, VAL, 14);
+//           if (n < 0) {
+//             st = 1; n = 15;
+//             push();
+//           }
+//         }
+//         /* keyword arguments */
+//         if (tree->cdr->car) {
+//           nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
+//           if (nk < 0) {st++; nk = 15;}
+//           else st += nk*2;
+//           n |= nk<<4;
+//         }
+//         /* block arguments */
+//         if (tree->cdr->cdr) {
+//           codegen(s, tree->cdr->cdr, VAL);
+//         }
+//         else if (s2) gen_blkmove(s, s2->ainfo, lv);
+//         else {
+//           genop_1(s, OP_LOADNIL, cursp());
+//           push();
+//         }
+//       }
+//       else {
+//         if (s2) gen_blkmove(s, s2->ainfo, lv);
+//         else {
+//           genop_1(s, OP_LOADNIL, cursp());
+//           push();
+//         }
+//       }
+//       st++;
+//       pop_n(st+1);
+//       genop_2(s, OP_SUPER, cursp(), n);
+//       if (val) push();
+//     }
+//     break;
 
-      push();
-      while (!s2->mscope) {
-        lv++;
-        s2 = s2->prev;
-        if (!s2) break;
-      }
-      if (tree) {
-        node *args = tree->car;
-        if (args) {
-          st = n = gen_values(s, args, VAL, 14);
-          if (n < 0) {
-            st = 1; n = 15;
-            push();
-          }
-        }
-        /* keyword arguments */
-        if (tree->cdr->car) {
-          nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
-          if (nk < 0) {st++; nk = 15;}
-          else st += nk*2;
-          n |= nk<<4;
-        }
-        /* block arguments */
-        if (tree->cdr->cdr) {
-          codegen(s, tree->cdr->cdr, VAL);
-        }
-        else if (s2) gen_blkmove(s, s2->ainfo, lv);
-        else {
-          genop_1(s, OP_LOADNIL, cursp());
-          push();
-        }
-      }
-      else {
-        if (s2) gen_blkmove(s, s2->ainfo, lv);
-        else {
-          genop_1(s, OP_LOADNIL, cursp());
-          push();
-        }
-      }
-      st++;
-      pop_n(st+1);
-      genop_2(s, OP_SUPER, cursp(), n);
-      if (val) push();
-    }
-    break;
+//   case NODE_ZSUPER:
+//     {
+//       codegen_scope *s2 = s;
+//       int lv = 0;
+//       uint16_t ainfo = 0;
+//       int n = CALL_MAXARGS;
+//       int sp = cursp();
 
-  case NODE_ZSUPER:
-    {
-      codegen_scope *s2 = s;
-      int lv = 0;
-      uint16_t ainfo = 0;
-      int n = CALL_MAXARGS;
-      int sp = cursp();
+//       push();        /* room for receiver */
+//       while (!s2->mscope) {
+//         lv++;
+//         s2 = s2->prev;
+//         if (!s2) break;
+//       }
+//       if (s2 && s2->ainfo > 0) {
+//         ainfo = s2->ainfo;
+//       }
+//       if (ainfo > 0) {
+//         genop_2S(s, OP_ARGARY, cursp(), (ainfo<<4)|(lv & 0xf));
+//         push(); push(); push();   /* ARGARY pushes 3 values at most */
+//         pop(); pop(); pop();
+//         /* keyword arguments */
+//         if (ainfo & 0x1) {
+//           n |= CALL_MAXARGS<<4;
+//           push();
+//         }
+//         /* block argument */
+//         if (tree && tree->cdr && tree->cdr->cdr) {
+//           push();
+//           codegen(s, tree->cdr->cdr, VAL);
+//         }
+//       }
+//       else {
+//         /* block argument */
+//         if (tree && tree->cdr && tree->cdr->cdr) {
+//           codegen(s, tree->cdr->cdr, VAL);
+//         }
+//         else {
+//           gen_blkmove(s, 0, lv);
+//         }
+//         n = 0;
+//       }
+//       s->sp = sp;
+//       genop_2(s, OP_SUPER, cursp(), n);
+//       if (val) push();
+//     }
+//     break;
 
-      push();        /* room for receiver */
-      while (!s2->mscope) {
-        lv++;
-        s2 = s2->prev;
-        if (!s2) break;
-      }
-      if (s2 && s2->ainfo > 0) {
-        ainfo = s2->ainfo;
-      }
-      if (ainfo > 0) {
-        genop_2S(s, OP_ARGARY, cursp(), (ainfo<<4)|(lv & 0xf));
-        push(); push(); push();   /* ARGARY pushes 3 values at most */
-        pop(); pop(); pop();
-        /* keyword arguments */
-        if (ainfo & 0x1) {
-          n |= CALL_MAXARGS<<4;
-          push();
-        }
-        /* block argument */
-        if (tree && tree->cdr && tree->cdr->cdr) {
-          push();
-          codegen(s, tree->cdr->cdr, VAL);
-        }
-      }
-      else {
-        /* block argument */
-        if (tree && tree->cdr && tree->cdr->cdr) {
-          codegen(s, tree->cdr->cdr, VAL);
-        }
-        else {
-          gen_blkmove(s, 0, lv);
-        }
-        n = 0;
-      }
-      s->sp = sp;
-      genop_2(s, OP_SUPER, cursp(), n);
-      if (val) push();
-    }
-    break;
+//   case NODE_RETURN:
+//     if (tree) {
+//       gen_retval(s, tree);
+//     }
+//     else {
+//       genop_1(s, OP_LOADNIL, cursp());
+//     }
+//     if (s->loop) {
+//       gen_return(s, OP_RETURN_BLK, cursp());
+//     }
+//     else {
+//       gen_return(s, OP_RETURN, cursp());
+//     }
+//     if (val) push();
+//     break;
 
-  case NODE_RETURN:
-    if (tree) {
-      gen_retval(s, tree);
-    }
-    else {
-      genop_1(s, OP_LOADNIL, cursp());
-    }
-    if (s->loop) {
-      gen_return(s, OP_RETURN_BLK, cursp());
-    }
-    else {
-      gen_return(s, OP_RETURN, cursp());
-    }
-    if (val) push();
-    break;
+//   case NODE_YIELD:
+//     {
+//       codegen_scope *s2 = s;
+//       int lv = 0, ainfo = -1;
+//       int n = 0, sendv = 0;
 
-  case NODE_YIELD:
-    {
-      codegen_scope *s2 = s;
-      int lv = 0, ainfo = -1;
-      int n = 0, sendv = 0;
+//       while (!s2->mscope) {
+//         lv++;
+//         s2 = s2->prev;
+//         if (!s2) break;
+//       }
+//       if (s2) {
+//         ainfo = (int)s2->ainfo;
+//       }
+//       if (ainfo < 0) codegen_error(s, "invalid yield (SyntaxError)");
+//       push();
+//       if (tree) {
+//         n = gen_values(s, tree, VAL, 14);
+//         if (n < 0) {
+//           n = sendv = 1;
+//           push();
+//         }
+//       }
+//       push();pop(); /* space for a block */
+//       pop_n(n+1);
+//       genop_2S(s, OP_BLKPUSH, cursp(), (ainfo<<4)|(lv & 0xf));
+//       if (sendv) n = CALL_MAXARGS;
+//       genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, call)), n);
+//       if (val) push();
+//     }
+//     break;
 
-      while (!s2->mscope) {
-        lv++;
-        s2 = s2->prev;
-        if (!s2) break;
-      }
-      if (s2) {
-        ainfo = (int)s2->ainfo;
-      }
-      if (ainfo < 0) codegen_error(s, "invalid yield (SyntaxError)");
-      push();
-      if (tree) {
-        n = gen_values(s, tree, VAL, 14);
-        if (n < 0) {
-          n = sendv = 1;
-          push();
-        }
-      }
-      push();pop(); /* space for a block */
-      pop_n(n+1);
-      genop_2S(s, OP_BLKPUSH, cursp(), (ainfo<<4)|(lv & 0xf));
-      if (sendv) n = CALL_MAXARGS;
-      genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, call)), n);
-      if (val) push();
-    }
-    break;
+//   case NODE_BREAK:
+//     loop_break(s, tree);
+//     if (val) push();
+//     break;
 
-  case NODE_BREAK:
-    loop_break(s, tree);
-    if (val) push();
-    break;
+//   case NODE_NEXT:
+//     if (!s->loop) {
+//       raise_error(s, "unexpected next");
+//     }
+//     else if (s->loop->type == LOOP_NORMAL) {
+//       codegen(s, tree, NOVAL);
+//       genjmp(s, OP_JMPUW, s->loop->pc0);
+//     }
+//     else {
+//       if (tree) {
+//         codegen(s, tree, VAL);
+//         pop();
+//       }
+//       else {
+//         genop_1(s, OP_LOADNIL, cursp());
+//       }
+//       gen_return(s, OP_RETURN, cursp());
+//     }
+//     if (val) push();
+//     break;
 
-  case NODE_NEXT:
-    if (!s->loop) {
-      raise_error(s, "unexpected next");
-    }
-    else if (s->loop->type == LOOP_NORMAL) {
-      codegen(s, tree, NOVAL);
-      genjmp(s, OP_JMPUW, s->loop->pc0);
-    }
-    else {
-      if (tree) {
-        codegen(s, tree, VAL);
-        pop();
-      }
-      else {
-        genop_1(s, OP_LOADNIL, cursp());
-      }
-      gen_return(s, OP_RETURN, cursp());
-    }
-    if (val) push();
-    break;
+//   case NODE_REDO:
+//     if (!s->loop || s->loop->type == LOOP_BEGIN || s->loop->type == LOOP_RESCUE) {
+//       raise_error(s, "unexpected redo");
+//     }
+//     else {
+//       genjmp(s, OP_JMPUW, s->loop->pc1);
+//     }
+//     if (val) push();
+//     break;
 
-  case NODE_REDO:
-    if (!s->loop || s->loop->type == LOOP_BEGIN || s->loop->type == LOOP_RESCUE) {
-      raise_error(s, "unexpected redo");
-    }
-    else {
-      genjmp(s, OP_JMPUW, s->loop->pc1);
-    }
-    if (val) push();
-    break;
+//   case NODE_RETRY:
+//     {
+//       const char *msg = "unexpected retry";
+//       const struct loopinfo *lp = s->loop;
 
-  case NODE_RETRY:
-    {
-      const char *msg = "unexpected retry";
-      const struct loopinfo *lp = s->loop;
+//       while (lp && lp->type != LOOP_RESCUE) {
+//         lp = lp->prev;
+//       }
+//       if (!lp) {
+//         raise_error(s, msg);
+//       }
+//       else {
+//         genjmp(s, OP_JMPUW, lp->pc0);
+//       }
+//       if (val) push();
+//     }
+//     break;
 
-      while (lp && lp->type != LOOP_RESCUE) {
-        lp = lp->prev;
-      }
-      if (!lp) {
-        raise_error(s, msg);
-      }
-      else {
-        genjmp(s, OP_JMPUW, lp->pc0);
-      }
-      if (val) push();
-    }
-    break;
+//   case NODE_LVAR:
+//     if (val) {
+//       int idx = lv_idx(s, nsym(tree));
 
-  case NODE_LVAR:
+//       if (idx > 0) {
+//         gen_move(s, cursp(), idx, val);
+//       }
+//       else {
+//         gen_getupvar(s, cursp(), nsym(tree));
+//       }
+//       push();
+//     }
+//     break;
+
+//   case NODE_NVAR:
+//     if (val) {
+//       int idx = nint(tree);
+
+//       gen_move(s, cursp(), idx, val);
+
+//       push();
+//     }
+//     break;
+
+//   case NODE_GVAR:
+//     {
+//       int sym = new_sym(s, nsym(tree));
+
+//       genop_2(s, OP_GETGV, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_IVAR:
+//     {
+//       int sym = new_sym(s, nsym(tree));
+
+//       genop_2(s, OP_GETIV, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_CVAR:
+//     {
+//       int sym = new_sym(s, nsym(tree));
+
+//       genop_2(s, OP_GETCV, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_CONST:
+//     {
+//       int sym = new_sym(s, nsym(tree));
+
+//       genop_2(s, OP_GETCONST, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_BACK_REF:
+//     if (val) {
+//       char buf[] = {'$', nchar(tree)};
+//       int sym = new_sym(s, mrb_intern(s->mrb, buf, sizeof(buf)));
+
+//       genop_2(s, OP_GETGV, cursp(), sym);
+//       push();
+//     }
+//     break;
+
+//   case NODE_NTH_REF:
+//     if (val) {
+//       mrb_state *mrb = s->mrb;
+//       mrb_value str;
+//       int sym;
+
+//       str = mrb_format(mrb, "$%d", nint(tree));
+//       sym = new_sym(s, mrb_intern_str(mrb, str));
+//       genop_2(s, OP_GETGV, cursp(), sym);
+//       push();
+//     }
+//     break;
+
+//   case NODE_ARG:
+//     /* should not happen */
+//     break;
+
+//   case NODE_BLOCK_ARG:
+//     if (!tree) {
+//       int idx = lv_idx(s, MRB_OPSYM_2(s->mrb, and));
+
+//       if (idx == 0) {
+//         gen_getupvar(s, cursp(), MRB_OPSYM_2(s->mrb, and));
+//       }
+//       else {
+//         gen_move(s, cursp(), idx, val);
+//       }
+//       if (val) push();
+//     }
+//     else {
+//       codegen(s, tree, val);
+//     }
+//     break;
+
+  case LRP(NODE_INT):
     if (val) {
-      int idx = lv_idx(s, nsym(tree));
-
-      if (idx > 0) {
-        gen_move(s, cursp(), idx, val);
-      }
-      else {
-        gen_getupvar(s, cursp(), nsym(tree));
-      }
-      push();
-    }
-    break;
-
-  case NODE_NVAR:
-    if (val) {
-      int idx = nint(tree);
-
-      gen_move(s, cursp(), idx, val);
-
-      push();
-    }
-    break;
-
-  case NODE_GVAR:
-    {
-      int sym = new_sym(s, nsym(tree));
-
-      genop_2(s, OP_GETGV, cursp(), sym);
-      if (val) push();
-    }
-    break;
-
-  case NODE_IVAR:
-    {
-      int sym = new_sym(s, nsym(tree));
-
-      genop_2(s, OP_GETIV, cursp(), sym);
-      if (val) push();
-    }
-    break;
-
-  case NODE_CVAR:
-    {
-      int sym = new_sym(s, nsym(tree));
-
-      genop_2(s, OP_GETCV, cursp(), sym);
-      if (val) push();
-    }
-    break;
-
-  case NODE_CONST:
-    {
-      int sym = new_sym(s, nsym(tree));
-
-      genop_2(s, OP_GETCONST, cursp(), sym);
-      if (val) push();
-    }
-    break;
-
-  case NODE_BACK_REF:
-    if (val) {
-      char buf[] = {'$', nchar(tree)};
-      int sym = new_sym(s, mrb_intern(s->mrb, buf, sizeof(buf)));
-
-      genop_2(s, OP_GETGV, cursp(), sym);
-      push();
-    }
-    break;
-
-  case NODE_NTH_REF:
-    if (val) {
-      mrb_state *mrb = s->mrb;
-      mrb_value str;
-      int sym;
-
-      str = mrb_format(mrb, "$%d", nint(tree));
-      sym = new_sym(s, mrb_intern_str(mrb, str));
-      genop_2(s, OP_GETGV, cursp(), sym);
-      push();
-    }
-    break;
-
-  case NODE_ARG:
-    /* should not happen */
-    break;
-
-  case NODE_BLOCK_ARG:
-    if (!tree) {
-      int idx = lv_idx(s, MRB_OPSYM_2(s->mrb, and));
-
-      if (idx == 0) {
-        gen_getupvar(s, cursp(), MRB_OPSYM_2(s->mrb, and));
-      }
-      else {
-        gen_move(s, cursp(), idx, val);
-      }
-      if (val) push();
-    }
-    else {
-      codegen(s, tree, val);
-    }
-    break;
-
-  case NODE_INT:
-    if (val) {
-      char *p = (char*)tree->car;
-      int base = nint(tree->cdr->car);
+      char *p = node->as.int_.value.ptr;
+      size_t plen = node->as.int_.value.len;
+      // int base = nint(tree->cdr->car);
+      int base = 10; // TODO
       mrb_int i;
       mrb_bool overflow;
 
-      i = readint(s, p, base, FALSE, &overflow);
+      i = readint(s, p, plen, base, FALSE, &overflow);
       if (overflow) {
-        int off = new_litbint(s, p, base, FALSE);
+        int off = new_litbint(s, p, plen, base, FALSE);
         genop_2(s, OP_LOADL, cursp(), off);
       }
       else {
@@ -3318,478 +3520,481 @@ codegen(codegen_scope *s, node *tree, int val)
     }
     break;
 
-#ifndef MRB_NO_FLOAT
-  case NODE_FLOAT:
+// #ifndef MRB_NO_FLOAT
+//   case NODE_FLOAT:
+//     if (val) {
+//       char *p = (char*)tree;
+//       mrb_float f = mrb_float_read(p, NULL);
+//       int off = new_lit_float(s, f);
+
+//       genop_2(s, OP_LOADL, cursp(), off);
+//       push();
+//     }
+//     break;
+// #endif
+
+//   case NODE_NEGATE:
+//     {
+//       nt = nint(tree->car);
+//       switch (nt) {
+// #ifndef MRB_NO_FLOAT
+//       case NODE_FLOAT:
+//         if (val) {
+//           char *p = (char*)tree->cdr;
+//           mrb_float f = mrb_float_read(p, NULL);
+//           int off = new_lit_float(s, -f);
+
+//           genop_2(s, OP_LOADL, cursp(), off);
+//           push();
+//         }
+//         break;
+// #endif
+
+//       case NODE_INT:
+//         if (val) {
+//           char *p = (char*)tree->cdr->car;
+//           int base = nint(tree->cdr->cdr->car);
+//           mrb_int i;
+//           mrb_bool overflow;
+
+//           i = readint(s, p, base, TRUE, &overflow);
+//           if (overflow) {
+//             int off = new_litbint(s, p, base, TRUE);
+//             genop_2(s, OP_LOADL, cursp(), off);
+//           }
+//           else {
+//             gen_int(s, cursp(), i);
+//           }
+//           push();
+//         }
+//         break;
+
+//       default:
+//         if (val) {
+//           codegen(s, tree, VAL);
+//           pop();
+//           push_n(2);pop_n(2); /* space for receiver&block */
+//           mrb_sym minus = MRB_OPSYM_2(s->mrb, minus);
+//           if (!gen_uniop(s, minus, cursp())) {
+//             genop_3(s, OP_SEND, cursp(), new_sym(s, minus), 0);
+//           }
+//           push();
+//         }
+//         else {
+//           codegen(s, tree, NOVAL);
+//         }
+//         break;
+//       }
+//     }
+//     break;
+
+//   case NODE_STR:
+//     if (val) {
+//       char *p = (char*)tree->car;
+//       mrb_int len = nint(tree->cdr);
+//       int off = new_lit_str(s, p, len);
+
+//       genop_2(s, OP_STRING, cursp(), off);
+//       push();
+//     }
+//     break;
+
+//   case NODE_HEREDOC:
+//     tree = ((struct mrb_parser_heredoc_info*)tree)->doc;
+//     /* fall through */
+//   case NODE_DSTR:
+//     if (val) {
+//       node *n = tree;
+
+//       if (!n) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//         break;
+//       }
+//       codegen(s, n->car, VAL);
+//       n = n->cdr;
+//       while (n) {
+//         codegen(s, n->car, VAL);
+//         pop(); pop();
+//         genop_1(s, OP_STRCAT, cursp());
+//         push();
+//         n = n->cdr;
+//       }
+//     }
+//     else {
+//       node *n = tree;
+
+//       while (n) {
+//         if (nint(n->car->car) != NODE_STR) {
+//           codegen(s, n->car, NOVAL);
+//         }
+//         n = n->cdr;
+//       }
+//     }
+//     break;
+
+//   case NODE_WORDS:
+//     gen_literal_array(s, tree, FALSE, val);
+//     break;
+
+//   case NODE_SYMBOLS:
+//     gen_literal_array(s, tree, TRUE, val);
+//     break;
+
+//   case NODE_DXSTR:
+//     {
+//       node *n;
+//       int sym = new_sym(s, MRB_SYM_2(s->mrb, Kernel));
+
+//       genop_1(s, OP_LOADSELF, cursp());
+//       push();
+//       codegen(s, tree->car, VAL);
+//       n = tree->cdr;
+//       while (n) {
+//         if (nint(n->car->car) == NODE_XSTR) {
+//           n->car->car = (struct mrb_ast_node*)(intptr_t)NODE_STR;
+//           mrb_assert(!n->cdr); /* must be the end */
+//         }
+//         codegen(s, n->car, VAL);
+//         pop(); pop();
+//         genop_1(s, OP_STRCAT, cursp());
+//         push();
+//         n = n->cdr;
+//       }
+//       push();                   /* for block */
+//       pop_n(3);
+//       sym = new_sym(s, MRB_OPSYM_2(s->mrb, tick)); /* ` */
+//       genop_3(s, OP_SEND, cursp(), sym, 1);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_XSTR:
+//     {
+//       char *p = (char*)tree->car;
+//       mrb_int len = nint(tree->cdr);
+//       int off = new_lit_str(s, p, len);
+//       int sym;
+
+//       genop_1(s, OP_LOADSELF, cursp());
+//       push();
+//       genop_2(s, OP_STRING, cursp(), off);
+//       push(); push();
+//       pop_n(3);
+//       sym = new_sym(s, MRB_OPSYM_2(s->mrb, tick)); /* ` */
+//       genop_3(s, OP_SEND, cursp(), sym, 1);
+//       if (val) push();
+//     }
+//     break;
+
+//   case NODE_REGX:
+//     if (val) {
+//       char *p1 = (char*)tree->car;
+//       char *p2 = (char*)tree->cdr->car;
+//       char *p3 = (char*)tree->cdr->cdr;
+//       int sym = new_sym(s, mrb_intern_lit(s->mrb, REGEXP_CLASS));
+//       int off = new_lit_cstr(s, p1);
+//       int argc = 1;
+
+//       genop_1(s, OP_OCLASS, cursp());
+//       genop_2(s, OP_GETMCNST, cursp(), sym);
+//       push();
+//       genop_2(s, OP_STRING, cursp(), off);
+//       push();
+//       if (p2 || p3) {
+//         if (p2) { /* opt */
+//           off = new_lit_cstr(s, p2);
+//           genop_2(s, OP_STRING, cursp(), off);
+//         }
+//         else {
+//           genop_1(s, OP_LOADNIL, cursp());
+//         }
+//         push();
+//         argc++;
+//         if (p3) { /* enc */
+//           off = new_lit_str(s, p3, 1);
+//           genop_2(s, OP_STRING, cursp(), off);
+//           push();
+//           argc++;
+//         }
+//       }
+//       push(); /* space for a block */
+//       pop_n(argc+2);
+//       sym = new_sym(s, MRB_SYM_2(s->mrb, compile));
+//       genop_3(s, OP_SEND, cursp(), sym, argc);
+//       push();
+//     }
+//     break;
+
+//   case NODE_DREGX:
+//     if (val) {
+//       node *n = tree->car;
+//       int sym = new_sym(s, mrb_intern_lit(s->mrb, REGEXP_CLASS));
+//       int argc = 1;
+//       int off;
+//       char *p;
+
+//       genop_1(s, OP_OCLASS, cursp());
+//       genop_2(s, OP_GETMCNST, cursp(), sym);
+//       push();
+//       codegen(s, n->car, VAL);
+//       n = n->cdr;
+//       while (n) {
+//         codegen(s, n->car, VAL);
+//         pop(); pop();
+//         genop_1(s, OP_STRCAT, cursp());
+//         push();
+//         n = n->cdr;
+//       }
+//       n = tree->cdr->cdr;
+//       if (n->car) { /* tail */
+//         p = (char*)n->car;
+//         off = new_lit_cstr(s, p);
+//         codegen(s, tree->car, VAL);
+//         genop_2(s, OP_STRING, cursp(), off);
+//         pop();
+//         genop_1(s, OP_STRCAT, cursp());
+//         push();
+//       }
+//       if (n->cdr->car) { /* opt */
+//         char *p2 = (char*)n->cdr->car;
+//         off = new_lit_cstr(s, p2);
+//         genop_2(s, OP_STRING, cursp(), off);
+//         push();
+//         argc++;
+//       }
+//       if (n->cdr->cdr) { /* enc */
+//         char *p2 = (char*)n->cdr->cdr;
+//         off = new_lit_cstr(s, p2);
+//         genop_2(s, OP_STRING, cursp(), off);
+//         push();
+//         argc++;
+//       }
+//       push(); /* space for a block */
+//       pop_n(argc+2);
+//       sym = new_sym(s, MRB_SYM_2(s->mrb, compile));
+//       genop_3(s, OP_SEND, cursp(), sym, argc);
+//       push();
+//     }
+//     else {
+//       node *n = tree->car;
+
+//       while (n) {
+//         if (nint(n->car->car) != NODE_STR) {
+//           codegen(s, n->car, NOVAL);
+//         }
+//         n = n->cdr;
+//       }
+//     }
+//     break;
+
+  case LRP(NODE_SYM):
     if (val) {
-      char *p = (char*)tree;
-      mrb_float f = mrb_float_read(p, NULL);
-      int off = new_lit_float(s, f);
-
-      genop_2(s, OP_LOADL, cursp(), off);
-      push();
-    }
-    break;
-#endif
-
-  case NODE_NEGATE:
-    {
-      nt = nint(tree->car);
-      switch (nt) {
-#ifndef MRB_NO_FLOAT
-      case NODE_FLOAT:
-        if (val) {
-          char *p = (char*)tree->cdr;
-          mrb_float f = mrb_float_read(p, NULL);
-          int off = new_lit_float(s, -f);
-
-          genop_2(s, OP_LOADL, cursp(), off);
-          push();
-        }
-        break;
-#endif
-
-      case NODE_INT:
-        if (val) {
-          char *p = (char*)tree->cdr->car;
-          int base = nint(tree->cdr->cdr->car);
-          mrb_int i;
-          mrb_bool overflow;
-
-          i = readint(s, p, base, TRUE, &overflow);
-          if (overflow) {
-            int off = new_litbint(s, p, base, TRUE);
-            genop_2(s, OP_LOADL, cursp(), off);
-          }
-          else {
-            gen_int(s, cursp(), i);
-          }
-          push();
-        }
-        break;
-
-      default:
-        if (val) {
-          codegen(s, tree, VAL);
-          pop();
-          push_n(2);pop_n(2); /* space for receiver&block */
-          mrb_sym minus = MRB_OPSYM_2(s->mrb, minus);
-          if (!gen_uniop(s, minus, cursp())) {
-            genop_3(s, OP_SEND, cursp(), new_sym(s, minus), 0);
-          }
-          push();
-        }
-        else {
-          codegen(s, tree, NOVAL);
-        }
-        break;
-      }
-    }
-    break;
-
-  case NODE_STR:
-    if (val) {
-      char *p = (char*)tree->car;
-      mrb_int len = nint(tree->cdr);
-      int off = new_lit_str(s, p, len);
-
-      genop_2(s, OP_STRING, cursp(), off);
-      push();
-    }
-    break;
-
-  case NODE_HEREDOC:
-    tree = ((struct mrb_parser_heredoc_info*)tree)->doc;
-    /* fall through */
-  case NODE_DSTR:
-    if (val) {
-      node *n = tree;
-
-      if (!n) {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-        break;
-      }
-      codegen(s, n->car, VAL);
-      n = n->cdr;
-      while (n) {
-        codegen(s, n->car, VAL);
-        pop(); pop();
-        genop_1(s, OP_STRCAT, cursp());
-        push();
-        n = n->cdr;
-      }
-    }
-    else {
-      node *n = tree;
-
-      while (n) {
-        if (nint(n->car->car) != NODE_STR) {
-          codegen(s, n->car, NOVAL);
-        }
-        n = n->cdr;
-      }
-    }
-    break;
-
-  case NODE_WORDS:
-    gen_literal_array(s, tree, FALSE, val);
-    break;
-
-  case NODE_SYMBOLS:
-    gen_literal_array(s, tree, TRUE, val);
-    break;
-
-  case NODE_DXSTR:
-    {
-      node *n;
-      int sym = new_sym(s, MRB_SYM_2(s->mrb, Kernel));
-
-      genop_1(s, OP_LOADSELF, cursp());
-      push();
-      codegen(s, tree->car, VAL);
-      n = tree->cdr;
-      while (n) {
-        if (nint(n->car->car) == NODE_XSTR) {
-          n->car->car = (struct mrb_ast_node*)(intptr_t)NODE_STR;
-          mrb_assert(!n->cdr); /* must be the end */
-        }
-        codegen(s, n->car, VAL);
-        pop(); pop();
-        genop_1(s, OP_STRCAT, cursp());
-        push();
-        n = n->cdr;
-      }
-      push();                   /* for block */
-      pop_n(3);
-      sym = new_sym(s, MRB_OPSYM_2(s->mrb, tick)); /* ` */
-      genop_3(s, OP_SEND, cursp(), sym, 1);
-      if (val) push();
-    }
-    break;
-
-  case NODE_XSTR:
-    {
-      char *p = (char*)tree->car;
-      mrb_int len = nint(tree->cdr);
-      int off = new_lit_str(s, p, len);
-      int sym;
-
-      genop_1(s, OP_LOADSELF, cursp());
-      push();
-      genop_2(s, OP_STRING, cursp(), off);
-      push(); push();
-      pop_n(3);
-      sym = new_sym(s, MRB_OPSYM_2(s->mrb, tick)); /* ` */
-      genop_3(s, OP_SEND, cursp(), sym, 1);
-      if (val) push();
-    }
-    break;
-
-  case NODE_REGX:
-    if (val) {
-      char *p1 = (char*)tree->car;
-      char *p2 = (char*)tree->cdr->car;
-      char *p3 = (char*)tree->cdr->cdr;
-      int sym = new_sym(s, mrb_intern_lit(s->mrb, REGEXP_CLASS));
-      int off = new_lit_cstr(s, p1);
-      int argc = 1;
-
-      genop_1(s, OP_OCLASS, cursp());
-      genop_2(s, OP_GETMCNST, cursp(), sym);
-      push();
-      genop_2(s, OP_STRING, cursp(), off);
-      push();
-      if (p2 || p3) {
-        if (p2) { /* opt */
-          off = new_lit_cstr(s, p2);
-          genop_2(s, OP_STRING, cursp(), off);
-        }
-        else {
-          genop_1(s, OP_LOADNIL, cursp());
-        }
-        push();
-        argc++;
-        if (p3) { /* enc */
-          off = new_lit_str(s, p3, 1);
-          genop_2(s, OP_STRING, cursp(), off);
-          push();
-          argc++;
-        }
-      }
-      push(); /* space for a block */
-      pop_n(argc+2);
-      sym = new_sym(s, MRB_SYM_2(s->mrb, compile));
-      genop_3(s, OP_SEND, cursp(), sym, argc);
-      push();
-    }
-    break;
-
-  case NODE_DREGX:
-    if (val) {
-      node *n = tree->car;
-      int sym = new_sym(s, mrb_intern_lit(s->mrb, REGEXP_CLASS));
-      int argc = 1;
-      int off;
-      char *p;
-
-      genop_1(s, OP_OCLASS, cursp());
-      genop_2(s, OP_GETMCNST, cursp(), sym);
-      push();
-      codegen(s, n->car, VAL);
-      n = n->cdr;
-      while (n) {
-        codegen(s, n->car, VAL);
-        pop(); pop();
-        genop_1(s, OP_STRCAT, cursp());
-        push();
-        n = n->cdr;
-      }
-      n = tree->cdr->cdr;
-      if (n->car) { /* tail */
-        p = (char*)n->car;
-        off = new_lit_cstr(s, p);
-        codegen(s, tree->car, VAL);
-        genop_2(s, OP_STRING, cursp(), off);
-        pop();
-        genop_1(s, OP_STRCAT, cursp());
-        push();
-      }
-      if (n->cdr->car) { /* opt */
-        char *p2 = (char*)n->cdr->car;
-        off = new_lit_cstr(s, p2);
-        genop_2(s, OP_STRING, cursp(), off);
-        push();
-        argc++;
-      }
-      if (n->cdr->cdr) { /* enc */
-        char *p2 = (char*)n->cdr->cdr;
-        off = new_lit_cstr(s, p2);
-        genop_2(s, OP_STRING, cursp(), off);
-        push();
-        argc++;
-      }
-      push(); /* space for a block */
-      pop_n(argc+2);
-      sym = new_sym(s, MRB_SYM_2(s->mrb, compile));
-      genop_3(s, OP_SEND, cursp(), sym, argc);
-      push();
-    }
-    else {
-      node *n = tree->car;
-
-      while (n) {
-        if (nint(n->car->car) != NODE_STR) {
-          codegen(s, n->car, NOVAL);
-        }
-        n = n->cdr;
-      }
-    }
-    break;
-
-  case NODE_SYM:
-    if (val) {
-      int sym = new_sym(s, nsym(tree));
+      int sym = new_sym(s, lrp_sym_bytes(s->mrb, node->as.sym.name));
 
       genop_2(s, OP_LOADSYM, cursp(), sym);
       push();
     }
     break;
 
-  case NODE_DSYM:
-    codegen(s, tree, val);
-    if (val) {
-      gen_intern(s);
-    }
-    break;
+//   case NODE_DSYM:
+//     codegen(s, tree, val);
+//     if (val) {
+//       gen_intern(s);
+//     }
+//     break;
 
-  case NODE_SELF:
+  case LRP(NODE_SELF_):
     if (val) {
       genop_1(s, OP_LOADSELF, cursp());
       push();
     }
     break;
 
-  case NODE_NIL:
+  case LRP(NODE_NIL):
     if (val) {
       genop_1(s, OP_LOADNIL, cursp());
       push();
     }
     break;
 
-  case NODE_TRUE:
+  case LRP(NODE_TRUE):
     if (val) {
       genop_1(s, OP_LOADT, cursp());
       push();
     }
     break;
 
-  case NODE_FALSE:
+  case LRP(NODE_FALSE):
     if (val) {
       genop_1(s, OP_LOADF, cursp());
       push();
     }
     break;
 
-  case NODE_ALIAS:
-    {
-      int a = new_sym(s, nsym(tree->car));
-      int b = new_sym(s, nsym(tree->cdr));
+//   case NODE_ALIAS:
+//     {
+//       int a = new_sym(s, nsym(tree->car));
+//       int b = new_sym(s, nsym(tree->cdr));
 
-      genop_2(s, OP_ALIAS, a, b);
-      if (val) {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-      }
-    }
-   break;
+//       genop_2(s, OP_ALIAS, a, b);
+//       if (val) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//       }
+//     }
+//    break;
 
-  case NODE_UNDEF:
-    {
-      node *t = tree;
+//   case NODE_UNDEF:
+//     {
+//       node *t = tree;
 
-      while (t) {
-        int symbol = new_sym(s, nsym(t->car));
-        genop_1(s, OP_UNDEF, symbol);
-        t = t->cdr;
-      }
-      if (val) {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-      }
-    }
-    break;
+//       while (t) {
+//         int symbol = new_sym(s, nsym(t->car));
+//         genop_1(s, OP_UNDEF, symbol);
+//         t = t->cdr;
+//       }
+//       if (val) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//       }
+//     }
+//     break;
 
-  case NODE_CLASS:
-    {
-      int idx;
-      node *body;
+//   case NODE_CLASS:
+//     {
+//       int idx;
+//       node *body;
 
-      if (tree->car->car == (node*)0) {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-      }
-      else if (tree->car->car == (node*)1) {
-        genop_1(s, OP_OCLASS, cursp());
-        push();
-      }
-      else {
-        codegen(s, tree->car->car, VAL);
-      }
-      if (tree->cdr->car) {
-        codegen(s, tree->cdr->car, VAL);
-      }
-      else {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-      }
-      pop(); pop();
-      idx = new_sym(s, nsym(tree->car->cdr));
-      genop_2(s, OP_CLASS, cursp(), idx);
-      body = tree->cdr->cdr->car;
-      if (nint(body->cdr->car) == NODE_BEGIN && body->cdr->cdr == NULL) {
-        genop_1(s, OP_LOADNIL, cursp());
-      }
-      else {
-        idx = scope_body(s, body, val);
-        genop_2(s, OP_EXEC, cursp(), idx);
-      }
-      if (val) {
-        push();
-      }
-    }
-    break;
+//       if (tree->car->car == (node*)0) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//       }
+//       else if (tree->car->car == (node*)1) {
+//         genop_1(s, OP_OCLASS, cursp());
+//         push();
+//       }
+//       else {
+//         codegen(s, tree->car->car, VAL);
+//       }
+//       if (tree->cdr->car) {
+//         codegen(s, tree->cdr->car, VAL);
+//       }
+//       else {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//       }
+//       pop(); pop();
+//       idx = new_sym(s, nsym(tree->car->cdr));
+//       genop_2(s, OP_CLASS, cursp(), idx);
+//       body = tree->cdr->cdr->car;
+//       if (nint(body->cdr->car) == NODE_BEGIN && body->cdr->cdr == NULL) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//       }
+//       else {
+//         idx = scope_body(s, body, val);
+//         genop_2(s, OP_EXEC, cursp(), idx);
+//       }
+//       if (val) {
+//         push();
+//       }
+//     }
+//     break;
 
-  case NODE_MODULE:
-    {
-      int idx;
+//   case NODE_MODULE:
+//     {
+//       int idx;
 
-      if (tree->car->car == (node*)0) {
-        genop_1(s, OP_LOADNIL, cursp());
-        push();
-      }
-      else if (tree->car->car == (node*)1) {
-        genop_1(s, OP_OCLASS, cursp());
-        push();
-      }
-      else {
-        codegen(s, tree->car->car, VAL);
-      }
-      pop();
-      idx = new_sym(s, nsym(tree->car->cdr));
-      genop_2(s, OP_MODULE, cursp(), idx);
-      if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
-          tree->cdr->car->cdr->cdr == NULL) {
-        genop_1(s, OP_LOADNIL, cursp());
-      }
-      else {
-        idx = scope_body(s, tree->cdr->car, val);
-        genop_2(s, OP_EXEC, cursp(), idx);
-      }
-      if (val) {
-        push();
-      }
-    }
-    break;
+//       if (tree->car->car == (node*)0) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//         push();
+//       }
+//       else if (tree->car->car == (node*)1) {
+//         genop_1(s, OP_OCLASS, cursp());
+//         push();
+//       }
+//       else {
+//         codegen(s, tree->car->car, VAL);
+//       }
+//       pop();
+//       idx = new_sym(s, nsym(tree->car->cdr));
+//       genop_2(s, OP_MODULE, cursp(), idx);
+//       if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
+//           tree->cdr->car->cdr->cdr == NULL) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//       }
+//       else {
+//         idx = scope_body(s, tree->cdr->car, val);
+//         genop_2(s, OP_EXEC, cursp(), idx);
+//       }
+//       if (val) {
+//         push();
+//       }
+//     }
+//     break;
 
-  case NODE_SCLASS:
-    {
-      int idx;
+//   case NODE_SCLASS:
+//     {
+//       int idx;
 
-      codegen(s, tree->car, VAL);
-      pop();
-      genop_1(s, OP_SCLASS, cursp());
-      if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
-          tree->cdr->car->cdr->cdr == NULL) {
-        genop_1(s, OP_LOADNIL, cursp());
-      }
-      else {
-        idx = scope_body(s, tree->cdr->car, val);
-        genop_2(s, OP_EXEC, cursp(), idx);
-      }
-      if (val) {
-        push();
-      }
-    }
-    break;
+//       codegen(s, tree->car, VAL);
+//       pop();
+//       genop_1(s, OP_SCLASS, cursp());
+//       if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
+//           tree->cdr->car->cdr->cdr == NULL) {
+//         genop_1(s, OP_LOADNIL, cursp());
+//       }
+//       else {
+//         idx = scope_body(s, tree->cdr->car, val);
+//         genop_2(s, OP_EXEC, cursp(), idx);
+//       }
+//       if (val) {
+//         push();
+//       }
+//     }
+//     break;
 
-  case NODE_DEF:
-    {
-      int sym = new_sym(s, nsym(tree->car));
-      int idx = lambda_body(s, tree->cdr, 0);
+//   case NODE_DEF:
+//     {
+//       int sym = new_sym(s, nsym(tree->car));
+//       int idx = lambda_body(s, tree->cdr, 0);
 
-      genop_1(s, OP_TCLASS, cursp());
-      push();
-      genop_2(s, OP_METHOD, cursp(), idx);
-      push(); pop();
-      pop();
-      genop_2(s, OP_DEF, cursp(), sym);
-      if (val) push();
-    }
-    break;
+//       genop_1(s, OP_TCLASS, cursp());
+//       push();
+//       genop_2(s, OP_METHOD, cursp(), idx);
+//       push(); pop();
+//       pop();
+//       genop_2(s, OP_DEF, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
 
-  case NODE_SDEF:
-    {
-      node *recv = tree->car;
-      int sym = new_sym(s, nsym(tree->cdr->car));
-      int idx = lambda_body(s, tree->cdr->cdr, 0);
+//   case NODE_SDEF:
+//     {
+//       node *recv = tree->car;
+//       int sym = new_sym(s, nsym(tree->cdr->car));
+//       int idx = lambda_body(s, tree->cdr->cdr, 0);
 
-      codegen(s, recv, VAL);
-      pop();
-      genop_1(s, OP_SCLASS, cursp());
-      push();
-      genop_2(s, OP_METHOD, cursp(), idx);
-      push(); pop();
-      pop();
-      genop_2(s, OP_DEF, cursp(), sym);
-      if (val) push();
-    }
-    break;
+//       codegen(s, recv, VAL);
+//       pop();
+//       genop_1(s, OP_SCLASS, cursp());
+//       push();
+//       genop_2(s, OP_METHOD, cursp(), idx);
+//       push(); pop();
+//       pop();
+//       genop_2(s, OP_DEF, cursp(), sym);
+//       if (val) push();
+//     }
+//     break;
 
-  case NODE_POSTEXE:
-    codegen(s, tree, NOVAL);
-    break;
+//   case NODE_POSTEXE:
+//     codegen(s, tree, NOVAL);
+//     break;
 
   default:
+    // printf("tag : %d\n", node->tag);
+    printf("tag : %s\n", node_type_name(node));
+    // printf("%s\n", node->tag == LRP(NODE_INT) ? "true" : "false");
     break;
   }
  exit:
@@ -3822,7 +4027,7 @@ scope_add_irep(codegen_scope *s)
 }
 
 static codegen_scope*
-scope_new(mrb_state *mrb, codegen_scope *prev, node *nlv)
+scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, node *nlv)
 {
   static const codegen_scope codegen_scope_zero = { 0 };
   mrb_pool *pool = mrb_pool_open(mrb);
@@ -3835,6 +4040,7 @@ scope_new(mrb_state *mrb, codegen_scope *prev, node *nlv)
   }
   *s = codegen_scope_zero;
   s->mrb = mrb;
+  s->cxt = cxt;
   s->mpool = pool;
   if (!prev) return s;
   s->prev = prev;
@@ -3871,22 +4077,22 @@ scope_new(mrb_state *mrb, codegen_scope *prev, node *nlv)
   }
   s->ai = mrb_gc_arena_save(mrb);
 
-  s->filename_sym = prev->filename_sym;
-  if (s->filename_sym) {
-    s->lines = (uint16_t*)mrb_malloc(mrb, sizeof(short)*s->icapa);
-  }
-  s->lineno = prev->lineno;
+  // s->filename_sym = prev->filename_sym;
+  // if (s->filename_sym) {
+  //   s->lines = (uint16_t*)mrb_malloc(mrb, sizeof(short)*s->icapa);
+  // }
+  // s->lineno = prev->lineno;
 
   /* debug setting */
-  s->debug_start_pos = 0;
-  if (s->filename_sym) {
-    mrb_debug_info_alloc(mrb, s->irep);
-  }
-  else {
+  // s->debug_start_pos = 0;
+  // if (s->filename_sym) {
+  //   mrb_debug_info_alloc(mrb, s->irep);
+  // }
+  // else {
     s->irep->debug_info = NULL;
-  }
+  // }
   s->parser = prev->parser;
-  s->filename_index = prev->filename_index;
+  // s->filename_index = prev->filename_index;
 
   s->rlev = prev->rlev+1;
 
@@ -3919,14 +4125,14 @@ scope_finish(codegen_scope *s)
   irep->pool = (const mrb_pool_value*)codegen_realloc(s, s->pool, sizeof(mrb_pool_value)*irep->plen);
   irep->syms = (const mrb_sym*)codegen_realloc(s, s->syms, sizeof(mrb_sym)*irep->slen);
   irep->reps = (const mrb_irep**)codegen_realloc(s, s->reps, sizeof(mrb_irep*)*irep->rlen);
-  if (s->filename_sym) {
-    mrb_sym fname = mrb_parser_get_filename(s->parser, s->filename_index);
-    const char *filename = mrb_sym_name_len(s->mrb, fname, NULL);
+  // if (s->filename_sym) {
+  //   mrb_sym fname = mrb_parser_get_filename(s->parser, s->filename_index);
+  //   const char *filename = mrb_sym_name_len(s->mrb, fname, NULL);
 
-    mrb_debug_info_append_file(s->mrb, s->irep->debug_info,
-                               filename, s->lines, s->debug_start_pos, s->pc);
-  }
-  mrb_free(s->mrb, s->lines);
+  //   mrb_debug_info_append_file(s->mrb, s->irep->debug_info,
+  //                              filename, s->lines, s->debug_start_pos, s->pc);
+  // }
+  // mrb_free(s->mrb, s->lines);
 
   irep->nlocals = s->nlocals;
   irep->nregs = s->nregs;
@@ -4042,9 +4248,9 @@ catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t 
 }
 
 static struct RProc*
-generate_code(mrb_state *mrb, parser_state *p, int val)
+generate_code(mrb_state *mrb, LRP(ParserResult) p, mrbc_context *cxt, int val)
 {
-  codegen_scope *scope = scope_new(mrb, 0, 0);
+  codegen_scope *scope = scope_new(mrb, cxt, NULL, NULL);
   struct mrb_jmpbuf *prev_jmp = mrb->jmp;
   struct mrb_jmpbuf jmpbuf;
   struct RProc *proc;
@@ -4053,12 +4259,12 @@ generate_code(mrb_state *mrb, parser_state *p, int val)
 
   scope->mrb = mrb;
   scope->parser = p;
-  scope->filename_sym = p->filename_sym;
-  scope->filename_index = p->current_filename_index;
+  // scope->filename_sym = lrp_sym(mrb, p.input.name);
+  // scope->filename_index = p->current_filename_index;
 
   MRB_TRY(mrb->jmp) {
     /* prepare irep */
-    codegen(scope, p->tree, val);
+    scope_body(scope, NULL, p.ast, NOVAL);
     proc = mrb_proc_new(mrb, scope->irep);
     mrb_irep_decref(mrb, scope->irep);
     mrb_pool_close(scope->mpool);
@@ -4079,23 +4285,91 @@ generate_code(mrb_state *mrb, parser_state *p, int val)
 }
 
 MRB_API struct RProc*
-mrb_generate_code(mrb_state *mrb, parser_state *p)
+lrp_generate_code(mrb_state *mrb, LRP(ParserResult) p, mrbc_context *cxt)
 {
-  return generate_code(mrb, p, VAL);
+  return generate_code(mrb, p, cxt, VAL);
 }
 
-void
-mrb_irep_remove_lv(mrb_state *mrb, mrb_irep *irep)
-{
-  int i;
+// void
+// mrb_irep_remove_lv(mrb_state *mrb, mrb_irep *irep)
+// {
+//   int i;
+//
+//   if (irep->flags & MRB_IREP_NO_FREE) return;
+//   if (irep->lv) {
+//     mrb_free(mrb, (void*)irep->lv);
+//     irep->lv = NULL;
+//   }
+//   if (!irep->reps) return;
+//   for (i = 0; i < irep->rlen; ++i) {
+//     mrb_irep_remove_lv(mrb, (mrb_irep*)irep->reps[i]);
+//   }
+// }
+#include <mruby/error.h>
+void mrb_codedump_all(mrb_state*, struct RProc*);
 
-  if (irep->flags & MRB_IREP_NO_FREE) return;
-  if (irep->lv) {
-    mrb_free(mrb, (void*)irep->lv);
-    irep->lv = NULL;
+MRB_API mrb_value
+lrp_load_exec(mrb_state *mrb, LRP(ParserResult) p, mrbc_context *c)
+{
+  struct RClass *target = mrb->object_class;
+  struct RProc *proc;
+  mrb_value v;
+  mrb_int keep = 0;
+  size_t nerr = 0;
+
+  for (size_t i = 0; i < p.diagnostics.len; i++) {
+    LRP(Diagnostic) *diagnostic = p.diagnostics.ptr + i;
+    fprintf(stderr, "%s\n", LRP(render_diagnostic)(diagnostic, &p.input));
+    if (diagnostic->level == LRP(ERROR_LEVEL_ERROR)) {
+      nerr += 1;
+    }
   }
-  if (!irep->reps) return;
-  for (i = 0; i < irep->rlen; ++i) {
-    mrb_irep_remove_lv(mrb, (mrb_irep*)irep->reps[i]);
+  if (nerr) {
+    if (c) c->parser_nerr = nerr;
+    if (/* p->capture_errors */ FALSE) {
+      // char buf[256];
+
+      // strcpy(buf, "line ");
+      // dump_int(p->error_buffer[0].lineno, buf+5);
+      // strcat(buf, ": ");
+      // strncat(buf, p->error_buffer[0].message, sizeof(buf) - strlen(buf) - 1);
+      // mrb->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, buf, strlen(buf)));
+      // mrb_parser_free(p);
+      // return mrb_undef_value();
+    } else {
+      if (mrb->exc == NULL) {
+        mrb->exc = mrb_obj_ptr(mrb_exc_new_lit(mrb, E_SYNTAX_ERROR, "syntax error"));
+      }
+      LRP(drop_parser_result)(&p);
+      return mrb_undef_value();
+    }
   }
+  proc = lrp_generate_code(mrb, p, c);
+  LRP(drop_parser_result)(&p);
+  if (proc == NULL) {
+    if (mrb->exc == NULL) {
+      mrb->exc = mrb_obj_ptr(mrb_exc_new_lit(mrb, E_SCRIPT_ERROR, "codegen error"));
+    }
+    return mrb_undef_value();
+  }
+  if (c) {
+    if (c->dump_result) mrb_codedump_all(mrb, proc);
+    if (c->no_exec) return mrb_obj_value(proc);
+    if (c->target_class) {
+      target = c->target_class;
+    }
+    if (c->keep_lv) {
+      keep = c->slen + 1;
+    }
+    else {
+      c->keep_lv = TRUE;
+    }
+  }
+  MRB_PROC_SET_TARGET_CLASS(proc, target);
+  if (mrb->c->ci) {
+    mrb_vm_ci_target_class_set(mrb->c->ci, target);
+  }
+  v = mrb_top_run(mrb, proc, mrb_top_self(mrb), keep);
+  if (mrb->exc) return mrb_nil_value();
+  return v;
 }

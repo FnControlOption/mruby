@@ -16,6 +16,25 @@
 #include <mruby/internal.h>
 #include <string.h>
 
+#include <lib-ruby-parser.h>
+
+#define LRP(x) LIB_RUBY_PARSER_##x
+
+mrb_value lrp_load_exec(mrb_state *mrb, LRP(ParserResult) p, mrbc_context *c);
+
+MRB_API LRP(ParserResult)
+lrp_parse_nstring(const char *s, size_t len)
+{
+  LRP(ByteList) input = LRP(new_bytes_from_cstr)(s, len);
+  LRP(ParserOptions) options = {
+    .buffer_name = LRP(new_string_from_cstr)("-e"),
+    .decoder = {.decoder = {.f = NULL}},
+    .record_tokens = false,
+    .token_rewriter = {.token_rewriter = {.f = NULL}}
+  };
+  return LRP(parse)(input, options);
+}
+
 #if SIZE_MAX < UINT32_MAX
 # error size_t must be at least 32 bits wide
 #endif
@@ -767,4 +786,95 @@ mrb_load_irep_file(mrb_state *mrb, FILE* fp)
 {
   return mrb_load_irep_file_cxt(mrb, fp, NULL);
 }
+
+MRB_API mrb_value
+mrb_load_file_cxt(mrb_state *mrb, FILE *f, mrbc_context *c)
+{
+  return mrb_load_exec(mrb, mrb_parse_file(mrb, f, c), c);
+}
+
+MRB_API mrb_value
+mrb_load_file(mrb_state *mrb, FILE *f)
+{
+  return mrb_load_file_cxt(mrb, f, NULL);
+}
+
+#define DETECT_SIZE 64
+
+struct mrb_parser_state *mrb_parse_file_continue(mrb_state *mrb, FILE *f, const void *prebuf, size_t prebufsize, mrbc_context *c);
+
+/*
+ * In order to be recognized as a `.mrb` file, the following three points must be satisfied:
+ * - File starts with "RITE"
+ * - At least `sizeof(struct rite_binary_header)` bytes can be read
+ * - `NUL` is included in the first 64 bytes of the file
+ */
+MRB_API mrb_value
+mrb_load_detect_file_cxt(mrb_state *mrb, FILE *fp, mrbc_context *c)
+{
+  union {
+    char b[DETECT_SIZE];
+    struct rite_binary_header h;
+  } leading;
+  size_t bufsize;
+
+  if (mrb == NULL || fp == NULL) {
+    return mrb_nil_value();
+  }
+
+  bufsize = fread(leading.b, sizeof(char), sizeof(leading), fp);
+  if (bufsize < sizeof(leading.h) ||
+      memcmp(leading.h.binary_ident, RITE_BINARY_IDENT, sizeof(leading.h.binary_ident)) != 0 ||
+      memchr(leading.b, '\0', bufsize) == NULL) {
+    return mrb_load_exec(mrb, mrb_parse_file_continue(mrb, fp, leading.b, bufsize, c), c);
+  }
+  else {
+    mrb_int binsize;
+    uint8_t *bin;
+    mrb_value bin_obj = mrb_nil_value(); /* temporary string object */
+    mrb_value result;
+
+    binsize = bin_to_uint32(leading.h.binary_size);
+    bin_obj = mrb_str_new(mrb, NULL, binsize);
+    bin = (uint8_t*)RSTRING_PTR(bin_obj);
+    if ((size_t)binsize > bufsize)  {
+      memcpy(bin, leading.b, bufsize);
+      if (fread(bin + bufsize, binsize - bufsize, 1, fp) == 0) {
+        binsize = bufsize;
+        /* The error is reported by mrb_load_irep_buf_cxt() */
+      }
+    }
+
+    result = mrb_load_irep_buf_cxt(mrb, bin, binsize, c);
+    if (mrb_string_p(bin_obj)) mrb_str_resize(mrb, bin_obj, 0);
+    return result;
+  }
+}
 #endif /* MRB_NO_STDIO */
+
+MRB_API mrb_value
+mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
+{
+  // mrb_value LRP = lrp_load_exec(mrb, lrp_parse_nstring(s, len), c);
+  // printf("LRP: %s\n", mrb_equal(mrb, LRP, mrb_undef_value()) ? "undef" : mrb_string_cstr(mrb, mrb_inspect(mrb, LRP)));
+  /* return */ lrp_load_exec(mrb, lrp_parse_nstring(s, len), c);
+  return mrb_load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
+}
+
+MRB_API mrb_value
+mrb_load_nstring(mrb_state *mrb, const char *s, size_t len)
+{
+  return mrb_load_nstring_cxt(mrb, s, len, NULL);
+}
+
+MRB_API mrb_value
+mrb_load_string_cxt(mrb_state *mrb, const char *s, mrbc_context *c)
+{
+  return mrb_load_nstring_cxt(mrb, s, strlen(s), c);
+}
+
+MRB_API mrb_value
+mrb_load_string(mrb_state *mrb, const char *s)
+{
+  return mrb_load_string_cxt(mrb, s, NULL);
+}

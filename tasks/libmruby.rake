@@ -1,7 +1,16 @@
 MRuby.each_target do
-  file libmruby_core_static => libmruby_core_objs.flatten do |t|
+  file libmruby_core_static => (libmruby_core_objs + Dir["#{MRUBY_ROOT}/libruby_parser_c/*.o"]).flatten do |t|
     archiver.run t.name, t.prerequisites
   end
+
+  # mkdir_p "#{build_dir}/libruby_parser_c"
+  # cd "#{build_dir}/libruby_parser_c" do
+  #   sh "#{filename(archiver.command)} x #{MRUBY_ROOT}/libruby_parser_c-x86_64-apple-darwin.a"
+  # end
+
+  # file libmruby_core_static => "#{MRUBY_ROOT}/libruby_parser_c-x86_64-apple-darwin.a" do |t|
+  #   linker.run t.name, ["#{MRUBY_ROOT}/libruby_parser_c-x86_64-apple-darwin.a"]
+  # end
 
   products << libmruby_core_static
 

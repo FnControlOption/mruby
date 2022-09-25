@@ -3,7 +3,7 @@ MRuby::Gem::Specification.new 'mruby-compiler' do |spec|
   spec.author  = 'mruby developers'
   spec.summary = 'mruby compiler library'
 
-  objs = %w[codegen y.tab].map do |name|
+  objs = %w[codegen codegen.lrp y.tab].map do |name|
     src = "#{dir}/core/#{name}.c"
     if build.cxx_exception_enabled?
       build.compile_as_cxx(src)

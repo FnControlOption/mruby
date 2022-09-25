@@ -474,7 +474,7 @@ EOS
     end
 
     def libraries
-      [libmruby_static]
+      [libmruby_static, "#{MRUBY_ROOT}/libruby_parser_c-x86_64-apple-darwin.a"]
     end
 
     def host?
