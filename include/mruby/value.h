@@ -435,10 +435,23 @@ mrb_ro_data_p(const char *p)
 #elif defined(__APPLE__)
 #define MRB_LINK_TIME_RO_DATA_P
 #include <mach-o/getsect.h>
+static unsigned long
+get_esect(const char *segname, const char *sectname)
+{
+#ifndef __LP64__
+  const struct section *sp;
+#else
+  const struct section_64 *sp;
+#endif
+  sp = getsectbyname(segname, sectname);
+  return sp ? sp->addr + sp->size : 0;
+}
 static inline mrb_bool
 mrb_ro_data_p(const char *p)
 {
-  return (char*)get_etext() < p && p < (char*)get_edata();
+  char *etext = (char*)get_esect(SEG_TEXT, SECT_TEXT);
+  char *edata = (char*)get_esect(SEG_DATA, SECT_DATA);
+  return etext < p && p < edata;
 }
 #endif  /* Linux or macOS */
 #endif  /* MRB_NO_DEFAULT_RO_DATA_P */
