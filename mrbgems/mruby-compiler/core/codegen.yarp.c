@@ -3665,35 +3665,37 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       gen_intern(s);
     }
     break;
+#endif
 
-  case NODE_SELF:
+  case YP_NODE_SELF_NODE:
     if (val) {
       genop_1(s, OP_LOADSELF, cursp());
       push();
     }
     break;
 
-  case NODE_NIL:
+  case YP_NODE_NIL_NODE:
     if (val) {
       genop_1(s, OP_LOADNIL, cursp());
       push();
     }
     break;
 
-  case NODE_TRUE:
+  case YP_NODE_TRUE_NODE:
     if (val) {
       genop_1(s, OP_LOADT, cursp());
       push();
     }
     break;
 
-  case NODE_FALSE:
+  case YP_NODE_FALSE_NODE:
     if (val) {
       genop_1(s, OP_LOADF, cursp());
       push();
     }
     break;
 
+#if 0
   case NODE_ALIAS:
     {
       int a = new_sym(s, nsym(tree->car));
