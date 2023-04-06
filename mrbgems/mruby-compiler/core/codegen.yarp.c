@@ -1019,7 +1019,6 @@ pop_n_(codegen_scope *s, int n)
 #define pop_n(n) pop_n_(s,n)
 #define cursp() (s->sp)
 
-#if 0
 static mrb_pool_value*
 lit_pool_extend(codegen_scope *s)
 {
@@ -1066,6 +1065,7 @@ new_litbint(codegen_scope *s, const char *p, int base, mrb_bool neg)
   return i;
 }
 
+#if 0
 static int
 new_lit_str(codegen_scope *s, const char *str, mrb_int len)
 {
@@ -1104,6 +1104,7 @@ new_lit_cstr(codegen_scope *s, const char *str)
 {
   return new_lit_str(s, str, (mrb_int)strlen(str));
 }
+#endif
 
 static int
 new_lit_int(codegen_scope *s, mrb_int num)
@@ -1137,6 +1138,7 @@ new_lit_int(codegen_scope *s, mrb_int num)
   return i;
 }
 
+#if 0
 #ifndef MRB_NO_FLOAT
 static int
 new_lit_float(codegen_scope *s, mrb_float num)
@@ -1198,6 +1200,7 @@ gen_setxv(codegen_scope *s, uint8_t op, uint16_t dst, mrb_sym sym, int val)
   }
   genop_2(s, op, dst, idx);
 }
+#endif
 
 static void
 gen_int(codegen_scope *s, uint16_t dst, mrb_int i)
@@ -1219,6 +1222,7 @@ gen_int(codegen_scope *s, uint16_t dst, mrb_int i)
   }
 }
 
+#if 0
 static mrb_bool
 gen_uniop(codegen_scope *s, mrb_sym sym, uint16_t dst)
 {
@@ -2184,11 +2188,11 @@ raise_error(codegen_scope *s, const char *msg)
 
   genop_1(s, OP_ERR, idx);
 }
+#endif
 
 static mrb_int
-readint(codegen_scope *s, const char *p, int base, mrb_bool neg, mrb_bool *overflow)
+readint(codegen_scope *s, const char *p, const char *e, int base, mrb_bool neg, mrb_bool *overflow)
 {
-  const char *e = p + strlen(p);
   mrb_int result = 0;
 
   mrb_assert(base >= 2 && base <= 16);
@@ -2231,6 +2235,7 @@ readint(codegen_scope *s, const char *p, int base, mrb_bool neg, mrb_bool *overf
   return result;
 }
 
+#if 0
 static void
 gen_retval(codegen_scope *s, node *tree)
 {
@@ -3350,15 +3355,17 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       codegen(s, tree, val);
     }
     break;
+#endif
 
-  case NODE_INT:
+  case YP_NODE_INTEGER_NODE:
     if (val) {
-      char *p = (char*)tree->car;
-      int base = nint(tree->cdr->car);
+      const char *p = node->location.start;
+      const char *e = node->location.end;
+      int base = 10; // TODO
       mrb_int i;
       mrb_bool overflow;
 
-      i = readint(s, p, base, FALSE, &overflow);
+      i = readint(s, p, e, base, FALSE, &overflow);
       if (overflow) {
         int off = new_litbint(s, p, base, FALSE);
         genop_2(s, OP_LOADL, cursp(), off);
@@ -3370,6 +3377,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
 #ifndef MRB_NO_FLOAT
   case NODE_FLOAT:
     if (val) {
