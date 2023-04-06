@@ -1,3 +1,7 @@
+#pragma clang diagnostic ignored "-Wundefined-internal"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-label"
+
 /*
 ** codegen.c - mruby code generator
 **
