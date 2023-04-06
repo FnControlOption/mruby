@@ -15,6 +15,8 @@
 #include <mruby/endian.h>
 #include <mruby/internal.h>
 #include <string.h>
+#include <stdio.h>
+#include <yarp.h>
 
 #if SIZE_MAX < UINT32_MAX
 # error size_t must be at least 32 bits wide
@@ -901,6 +903,34 @@ mrb_load_detect_file_cxt(mrb_state *mrb, FILE *fp, mrbc_context *c)
 MRB_API mrb_value
 mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
 {
+  yp_parser_t parser;
+  yp_parser_init(&parser, s, len, NULL);
+
+  yp_node_t *node = yp_parse(&parser);
+
+  // fprintf(stderr, "node->type : %d\n", node->type);
+  // yp_print_node(&parser, node);
+  // yarp_load_exec(mrb, node, c);
+
+  // yp_buffer_t buffer;
+  // yp_buffer_init(&buffer);
+  // yp_serialize(&parser, node, &buffer);
+  // fprintf(stderr, "%.*s\n", (int) buffer.length, buffer.value);
+  // yp_buffer_free(&buffer);
+
+  // assert(node->type == YP_NODE_PROGRAM_NODE);
+  // yp_program_node_t *program = (yp_program_node_t *)node;
+  // assert(program->statements->body.size == 1);
+  // yp_node_t *body = program->statements->body.nodes[0];
+  // assert(body->type == YP_NODE_SYMBOL_NODE);
+  // yp_symbol_node_t *symbol = (yp_symbol_node_t *)body;
+  // fprintf(stderr, "symbol : %s\n", yp_token_type_to_str(symbol->value.type));
+  // // fprintf(stderr, "body->type : %d\n", body->type);
+  // // fprintf(stderr, "body.size : %lu\n", );
+
+  yp_node_destroy(&parser, node);
+  yp_parser_free(&parser);
+
   return mrb_load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
 }
 
