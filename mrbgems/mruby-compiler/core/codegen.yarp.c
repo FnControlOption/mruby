@@ -24,6 +24,7 @@
 #include <string.h>
 #include <mruby/internal.h>
 #include <yarp.h>
+#include <yarp/ast.h>
 MRB_INLINE mrb_sym yarp_sym(mrb_state *mrb, yp_token_t token)
 { return mrb_intern(mrb, token.start, token.end - token.start); }
 MRB_INLINE mrb_sym yarp_sym2(mrb_state *mrb, yp_location_t location)
