@@ -26,6 +26,8 @@
 #include <yarp.h>
 MRB_INLINE mrb_sym yarp_sym(mrb_state *mrb, yp_token_t token)
 { return mrb_intern(mrb, token.start, token.end - token.start); }
+MRB_INLINE mrb_sym yarp_sym2(mrb_state *mrb, yp_location_t location)
+{ return mrb_intern(mrb, location.start, location.end - location.start); }
 
 #ifndef MRB_CODEGEN_LEVEL_MAX
 #define MRB_CODEGEN_LEVEL_MAX 256
@@ -3264,34 +3266,36 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       push();
     }
     break;
+#endif
 
-  case NODE_GVAR:
+  case YP_NODE_GLOBAL_VARIABLE_READ_NODE:
     {
-      int sym = new_sym(s, nsym(tree));
+      int sym = new_sym(s, yarp_sym2(s->mrb, node->location));
 
       genop_2(s, OP_GETGV, cursp(), sym);
       if (val) push();
     }
     break;
 
-  case NODE_IVAR:
+  case YP_NODE_INSTANCE_VARIABLE_READ_NODE:
     {
-      int sym = new_sym(s, nsym(tree));
+      int sym = new_sym(s, yarp_sym2(s->mrb, node->location));
 
       genop_2(s, OP_GETIV, cursp(), sym);
       if (val) push();
     }
     break;
 
-  case NODE_CVAR:
+  case YP_NODE_CLASS_VARIABLE_READ_NODE:
     {
-      int sym = new_sym(s, nsym(tree));
+      int sym = new_sym(s, yarp_sym2(s->mrb, node->location));
 
       genop_2(s, OP_GETCV, cursp(), sym);
       if (val) push();
     }
     break;
 
+#if 0
   case NODE_CONST:
     {
       int sym = new_sym(s, nsym(tree));
