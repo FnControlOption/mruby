@@ -2742,28 +2742,30 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       push();
     }
     break;
+#endif
 
-  case NODE_COLON2:
-    {
-      int sym = new_sym(s, nsym(tree->cdr));
+  case YP_NODE_CONSTANT_PATH_NODE: {
+    yp_constant_path_node_t *path = (yp_constant_path_node_t*)node;
+    /*mrb_*/assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
+    if (path->parent) {
+      int sym = new_sym(s, yarp_sym2(s->mrb, path->child->location));
 
-      codegen(s, tree->car, VAL);
+      codegen(s, path->parent, VAL);
       pop();
       genop_2(s, OP_GETMCNST, cursp(), sym);
       if (val) push();
     }
-    break;
-
-  case NODE_COLON3:
-    {
-      int sym = new_sym(s, nsym(tree));
+    else {
+      int sym = new_sym(s, yarp_sym2(s->mrb, path->child->location));
 
       genop_1(s, OP_OCLASS, cursp());
       genop_2(s, OP_GETMCNST, cursp(), sym);
       if (val) push();
     }
     break;
+  }
 
+#if 0
   case NODE_ARRAY:
     {
       int n;
@@ -3295,16 +3297,16 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_CONST:
+  case YP_NODE_CONSTANT_READ_NODE:
     {
-      int sym = new_sym(s, nsym(tree));
+      int sym = new_sym(s, yarp_sym2(s->mrb, node->location));
 
       genop_2(s, OP_GETCONST, cursp(), sym);
       if (val) push();
     }
     break;
 
+#if 0
   case NODE_BACK_REF:
     if (val) {
       char buf[] = {'$', nchar(tree)};
