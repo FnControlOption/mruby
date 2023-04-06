@@ -2722,27 +2722,27 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case NODE_SCALL:
     gen_call(s, tree, val, 1);
     break;
+#endif
 
-  case NODE_DOT2:
-    codegen(s, tree->car, val);
-    codegen(s, tree->cdr, val);
-    if (val) {
+  case YP_NODE_RANGE_NODE: {
+    yp_range_node_t *range = (yp_range_node_t*)node;
+    codegen(s, range->left, val);
+    codegen(s, range->right, val);
+    if (!val)
+      break;
+    // TODO: Add field to differentiate '..' and '...' ?
+    if (range->operator_loc.end - range->operator_loc.start == 2) {
       pop(); pop();
       genop_1(s, OP_RANGE_INC, cursp());
       push();
     }
-    break;
-
-  case NODE_DOT3:
-    codegen(s, tree->car, val);
-    codegen(s, tree->cdr, val);
-    if (val) {
+    else {
       pop(); pop();
       genop_1(s, OP_RANGE_EXC, cursp());
       push();
     }
     break;
-#endif
+  }
 
   case YP_NODE_CONSTANT_PATH_NODE: {
     yp_constant_path_node_t *path = (yp_constant_path_node_t*)node;
