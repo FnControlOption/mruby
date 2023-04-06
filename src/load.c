@@ -836,6 +836,69 @@ mrb_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrbc_context *c)
   return v;
 }
 
+MRB_API struct RProc* yarp_generate_code(mrb_state *mrb, struct mrb_parser_state *p);
+MRB_API mrb_value
+yarp_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrbc_context *c)
+{
+  struct RClass *target = mrb->object_class;
+  struct RProc *proc;
+  mrb_value v;
+  mrb_int keep = 0;
+
+  if (!p) {
+    return mrb_undef_value();
+  }
+  if (!p->tree || p->nerr) {
+    if (c) c->parser_nerr = p->nerr;
+    if (p->capture_errors) {
+      char buf[256];
+
+      strcpy(buf, "line ");
+      mrb_parser_dump_int(p->error_buffer[0].lineno, buf+5);
+      strcat(buf, ": ");
+      strncat(buf, p->error_buffer[0].message, sizeof(buf) - strlen(buf) - 1);
+      mrb->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, buf, strlen(buf)));
+      mrb_parser_free(p);
+      return mrb_undef_value();
+    }
+    else {
+      if (mrb->exc == NULL) {
+        mrb->exc = mrb_obj_ptr(mrb_exc_new_lit(mrb, E_SYNTAX_ERROR, "syntax error"));
+      }
+      mrb_parser_free(p);
+      return mrb_undef_value();
+    }
+  }
+  proc = yarp_generate_code(mrb, p);
+  mrb_parser_free(p);
+  if (proc == NULL) {
+    if (mrb->exc == NULL) {
+      mrb->exc = mrb_obj_ptr(mrb_exc_new_lit(mrb, E_SCRIPT_ERROR, "codegen error"));
+    }
+    return mrb_undef_value();
+  }
+  if (c) {
+    if (c->dump_result) mrb_codedump_all(mrb, proc);
+    if (c->no_exec) return mrb_obj_value(proc);
+    if (c->target_class) {
+      target = c->target_class;
+    }
+    if (c->keep_lv) {
+      keep = c->slen + 1;
+    }
+    else {
+      c->keep_lv = TRUE;
+    }
+  }
+  MRB_PROC_SET_TARGET_CLASS(proc, target);
+  if (mrb->c->ci) {
+    mrb_vm_ci_target_class_set(mrb->c->ci, target);
+  }
+  v = mrb_top_run(mrb, proc, mrb_top_self(mrb), keep);
+  if (mrb->exc) return mrb_nil_value();
+  return v;
+}
+
 #ifndef MRB_NO_STDIO
 MRB_API mrb_value
 mrb_load_file_cxt(mrb_state *mrb, FILE *f, mrbc_context *c)
@@ -911,6 +974,7 @@ mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
   // fprintf(stderr, "node->type : %d\n", node->type);
   // yp_print_node(&parser, node);
   // yarp_load_exec(mrb, node, c);
+  yarp_load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
 
   // yp_buffer_t buffer;
   // yp_buffer_init(&buffer);

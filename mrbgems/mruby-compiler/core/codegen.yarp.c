@@ -333,6 +333,7 @@ no_optimize(codegen_scope *s)
   return FALSE;
 }
 
+#if 0
 struct mrb_insn_data
 mrb_decode_insn(const mrb_code *pc)
 {
@@ -384,6 +385,7 @@ mrb_decode_insn(const mrb_code *pc)
   data.c = c;
   return data;
 }
+#endif
 
 #undef OPCODE
 #define Z 1
@@ -4077,11 +4079,12 @@ generate_code(mrb_state *mrb, parser_state *p, int val)
 }
 
 MRB_API struct RProc*
-mrb_generate_code(mrb_state *mrb, parser_state *p)
+yarp_generate_code(mrb_state *mrb, parser_state *p)
 {
   return generate_code(mrb, p, VAL);
 }
 
+#if 0
 void
 mrb_irep_remove_lv(mrb_state *mrb, mrb_irep *irep)
 {
@@ -4097,3 +4100,4 @@ mrb_irep_remove_lv(mrb_state *mrb, mrb_irep *irep)
     mrb_irep_remove_lv(mrb, (mrb_irep*)irep->reps[i]);
   }
 }
+#endif
