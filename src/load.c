@@ -836,15 +836,16 @@ mrb_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrbc_context *c)
   return v;
 }
 
-MRB_API struct RProc* yarp_generate_code(mrb_state *mrb, struct mrb_parser_state *p);
+MRB_API struct RProc* yarp_generate_code(mrb_state *mrb, mrbc_context *cxt, yp_parser_t *p, yp_node_t *node);
 MRB_API mrb_value
-yarp_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrbc_context *c)
+yarp_load_exec(mrb_state *mrb, yp_parser_t *p, yp_node_t *node, mrbc_context *c)
 {
   struct RClass *target = mrb->object_class;
   struct RProc *proc;
   mrb_value v;
   mrb_int keep = 0;
 
+#if 0
   if (!p) {
     return mrb_undef_value();
   }
@@ -869,8 +870,11 @@ yarp_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrbc_context *c)
       return mrb_undef_value();
     }
   }
-  proc = yarp_generate_code(mrb, p);
+#endif
+  proc = yarp_generate_code(mrb, c, p, node);
+#if 0
   mrb_parser_free(p);
+#endif
   if (proc == NULL) {
     if (mrb->exc == NULL) {
       mrb->exc = mrb_obj_ptr(mrb_exc_new_lit(mrb, E_SCRIPT_ERROR, "codegen error"));
@@ -972,9 +976,8 @@ mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
   yp_node_t *node = yp_parse(&parser);
 
   // fprintf(stderr, "node->type : %d\n", node->type);
-  // yp_print_node(&parser, node);
-  // yarp_load_exec(mrb, node, c);
-  yarp_load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
+  yp_print_node(&parser, node);
+  mrb_p(mrb, yarp_load_exec(mrb, &parser, node, c));
 
   // yp_buffer_t buffer;
   // yp_buffer_init(&buffer);
