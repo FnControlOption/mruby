@@ -2495,16 +2495,22 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       codegen(s, tree->car, val);
     }
     break;
+#endif
 
-  case NODE_LAMBDA:
+  case YP_NODE_LAMBDA_NODE:
     if (val) {
-      int idx = lambda_body(s, tree, 1);
+      yp_lambda_node_t *lambda = (yp_lambda_node_t*)node;
+      yp_parameters_node_t *parameters = NULL;
+      if (lambda->parameters)
+        parameters = lambda->parameters->parameters;
+      int idx = lambda_body(s, lambda->scope, parameters, lambda->statements, 1);
 
       genop_2(s, OP_LAMBDA, cursp(), idx);
       push();
     }
     break;
 
+#if 0
   case NODE_BLOCK:
     if (val) {
       int idx = lambda_body(s, tree, 1);
