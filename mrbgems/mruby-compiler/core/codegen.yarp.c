@@ -1558,11 +1558,11 @@ lambda_body(codegen_scope *s, node *tree, int blk)
 #endif
 
 static int
-scope_body(codegen_scope *s, yp_scope_node_t *nlv, yp_statements_node_t *statements, int val)
+scope_body(codegen_scope *s, yp_scope_node_t *nlv, yp_node_t *statements, int val)
 {
   codegen_scope *scope = scope_new(s->mrb, s->cxt, s, nlv);
 
-  codegen(scope, &statements->base, VAL);
+  codegen(scope, statements, VAL);
   gen_return(scope, OP_RETURN, scope->sp-1);
   if (!s->iseq) {
     genop_0(scope, OP_STOP);
@@ -2724,7 +2724,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
   case YP_NODE_PROGRAM_NODE: {
     yp_program_node_t *program = (yp_program_node_t*)node;
-    scope_body(s, program->scope, program->statements, NOVAL);
+    scope_body(s, program->scope, &program->statements->base, NOVAL);
     break;
   }
 
@@ -3815,20 +3815,21 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
+#endif
 
-  case NODE_SCLASS:
+  case YP_NODE_SINGLETON_CLASS_NODE:
     {
+      yp_singleton_class_node_t *sclass = (yp_singleton_class_node_t*)node;
       int idx;
 
-      codegen(s, tree->car, VAL);
+      codegen(s, sclass->expression, VAL);
       pop();
       genop_1(s, OP_SCLASS, cursp());
-      if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
-          tree->cdr->car->cdr->cdr == NULL) {
+      if (sclass->statements == NULL) {
         genop_1(s, OP_LOADNIL, cursp());
       }
       else {
-        idx = scope_body(s, tree->cdr->car, val);
+        idx = scope_body(s, sclass->scope, sclass->statements, val);
         genop_2(s, OP_EXEC, cursp(), idx);
       }
       if (val) {
@@ -3837,6 +3838,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_DEF:
     {
       int sym = new_sym(s, nsym(tree->car));
