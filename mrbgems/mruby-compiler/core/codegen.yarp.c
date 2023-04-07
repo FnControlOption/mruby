@@ -124,7 +124,7 @@ static int catch_handler_new(codegen_scope *s);
 static void catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t begin, uint32_t end, uint32_t target);
 
 static void gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int val);
-static void gen_massignment(codegen_scope *s, node *tree, int sp, int val);
+static void gen_massignment(codegen_scope *s, yp_node_list_t targets, int sp, int val);
 
 static void codegen(codegen_scope *s, yp_node_t *node, int val);
 static void raise_error(codegen_scope *s, const char *msg);
@@ -1574,17 +1574,16 @@ scope_body(codegen_scope *s, yp_scope_node_t *nlv, yp_node_t *statements, int va
   return s->irep->rlen - 1;
 }
 
-#if 0
 static mrb_bool
-nosplat(node *t)
+nosplat(yp_array_node_t *array)
 {
-  while (t) {
-    if (nint(t->car->car) == NODE_SPLAT) return FALSE;
-    t = t->cdr;
+  for (size_t i = 0; i < array->elements.size; i++) {
+    if (array->elements.nodes[i]->type == YP_NODE_SPLAT_NODE) return FALSE;
   }
   return TRUE;
 }
 
+#if 0
 static mrb_sym
 attrsym(codegen_scope *s, mrb_sym a)
 {
@@ -1888,6 +1887,16 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
     break;
 #endif
 
+  case YP_NODE_SPLAT_NODE:
+    {
+      /*mrb_*/assert(rhs == NULL);
+      /*mrb_*/assert(val == NOVAL);
+      yp_splat_node_t *splat = (yp_splat_node_t*)node;
+      if (splat->expression)
+        gen_assignment(s, splat->expression, NULL, sp, NOVAL);
+      return;
+    }
+
   default:
     codegen_error(s, "unknown lhs");
     break;
@@ -2070,49 +2079,56 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
   if (val) push();
 }
 
-#if 0
 static void
-gen_massignment(codegen_scope *s, node *tree, int rhs, int val)
+count_multi_write(yp_node_list_t targets, int *pre, yp_splat_node_t **splat, int *post) {
+  for (size_t i = 0; i < targets.size; i++) {
+    yp_node_t *node = targets.nodes[i];
+    if (node->type == YP_NODE_SPLAT_NODE) {
+      *splat = (yp_splat_node_t*)node;
+      continue;
+    }
+    if (*splat) {
+      (*post)++;
+    } else {
+      (*pre)++;
+    }
+  }
+}
+
+static void
+gen_massignment(codegen_scope *s, yp_node_list_t targets, int rhs, int val)
 {
   int n = 0, post = 0;
-  node *t, *p;
 
-  if (tree->car) {              /* pre */
-    t = tree->car;
+  int idx = 0, pre = 0;
+  yp_splat_node_t *splat = NULL;
+  count_multi_write(targets, &pre, &splat, &post);
+  if (pre > 0) {
     n = 0;
-    while (t) {
+    while (idx < pre) {
       int sp = cursp();
 
       genop_3(s, OP_AREF, sp, rhs, n);
       push();
-      gen_assignment(s, t->car, NULL, sp, NOVAL);
+      gen_assignment(s, targets.nodes[idx], NULL, sp, NOVAL);
       pop();
       n++;
-      t = t->cdr;
+      idx++;
     }
   }
-  t = tree->cdr;
-  if (t) {
-    if (t->cdr) {               /* post count */
-      p = t->cdr->car;
-      while (p) {
-        post++;
-        p = p->cdr;
-      }
-    }
+  if (true) {
     gen_move(s, cursp(), rhs, val);
     push_n(post+1);
     pop_n(post+1);
     genop_3(s, OP_APOST, cursp(), n, post);
     n = 1;
-    if (t->car && t->car != (node*)-1) { /* rest */
-      gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+    if (splat && splat->expression) {
+      gen_assignment(s, splat->expression, NULL, cursp(), NOVAL);
     }
-    if (t->cdr && t->cdr->car) {
-      t = t->cdr->car;
-      while (t) {
-        gen_assignment(s, t->car, NULL, cursp()+n, NOVAL);
-        t = t->cdr;
+    if (post > 0) {
+      while (idx < targets.size) {
+        gen_assignment(s, targets.nodes[idx], NULL, cursp()+n, NOVAL);
+        idx++;
         n++;
       }
     }
@@ -2122,6 +2138,7 @@ gen_massignment(codegen_scope *s, node *tree, int rhs, int val)
   }
 }
 
+#if 0
 static void
 gen_intern(codegen_scope *s)
 {
@@ -2898,47 +2915,40 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     gen_assignment(s, node, ((yp_constant_path_write_node_t*)node)->value, 0, val);
     break;
 
-#if 0
-  case NODE_MASGN:
+  case YP_NODE_MULTI_WRITE_NODE:
     {
+      yp_multi_write_node_t *write = (yp_multi_write_node_t*)node;
+      yp_node_list_t targets = write->targets;
       int len = 0, n = 0, post = 0;
-      node *t = tree->cdr, *p;
+      yp_node_t *t = write->value;
       int rhs = cursp();
 
-      if (!val && nint(t->car) == NODE_ARRAY && t->cdr && nosplat(t->cdr)) {
+      if (!val && t->type == YP_NODE_ARRAY_NODE && nosplat((yp_array_node_t*)t)) {
         /* fixed rhs */
-        t = t->cdr;
-        while (t) {
-          codegen(s, t->car, VAL);
+        yp_array_node_t *array = (yp_array_node_t*)t;
+        for (size_t i = 0; i < array->elements.size; i++) {
+          codegen(s, array->elements.nodes[i], VAL);
           len++;
-          t = t->cdr;
         }
-        tree = tree->car;
-        if (tree->car) {                /* pre */
-          t = tree->car;
+        int idx = 0, pre = 0;
+        yp_splat_node_t *splat = NULL;
+        count_multi_write(targets, &pre, &splat, &post);
+        if (pre > 0) {
           n = 0;
-          while (t) {
+          while (idx < pre) {
             if (n < len) {
-              gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+              gen_assignment(s, targets.nodes[idx], NULL, rhs+n, NOVAL);
               n++;
             }
             else {
               genop_1(s, OP_LOADNIL, rhs+n);
-              gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+              gen_assignment(s, targets.nodes[idx], NULL, rhs+n, NOVAL);
             }
-            t = t->cdr;
+            idx++;
           }
         }
-        t = tree->cdr;
-        if (t) {
-          if (t->cdr) {         /* post count */
-            p = t->cdr->car;
-            while (p) {
-              post++;
-              p = p->cdr;
-            }
-          }
-          if (t->car) {         /* rest (len - pre - post) */
+        if (true) {
+          if (splat) {
             int rn;
 
             if (len < post + n) {
@@ -2953,20 +2963,19 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
             else {
               genop_3(s, OP_ARRAY2, cursp(), rhs+n, rn);
             }
-            gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+            gen_assignment(s, splat->expression, NULL, cursp(), NOVAL);
             n += rn;
           }
-          if (t->cdr && t->cdr->car) {
-            t = t->cdr->car;
-            while (t) {
+          if (post > 0) {
+            while (idx < targets.size) {
               if (n<len) {
-                gen_assignment(s, t->car, NULL, rhs+n, NOVAL);
+                gen_assignment(s, targets.nodes[idx], NULL, rhs+n, NOVAL);
               }
               else {
                 genop_1(s, OP_LOADNIL, cursp());
-                gen_assignment(s, t->car, NULL, cursp(), NOVAL);
+                gen_assignment(s, targets.nodes[idx], NULL, cursp(), NOVAL);
               }
-              t = t->cdr;
+              idx++;
               n++;
             }
           }
@@ -2976,7 +2985,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       else {
         /* variable rhs */
         codegen(s, t, VAL);
-        gen_massignment(s, tree->car, rhs, val);
+        gen_massignment(s, targets, rhs, val);
         if (!val) {
           pop();
         }
@@ -2984,6 +2993,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_OP_ASGN:
     {
       mrb_sym sym = nsym(tree->cdr->car);
