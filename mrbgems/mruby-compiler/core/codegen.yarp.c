@@ -1605,13 +1605,14 @@ attrsym(codegen_scope *s, mrb_sym a)
 
   return mrb_intern(s->mrb, name2, len+1);
 }
+#endif
 
 #define CALL_MAXARGS 15
 #define GEN_LIT_ARY_MAX 64
 #define GEN_VAL_STACK_MAX 99
 
 static int
-gen_values(codegen_scope *s, node *t, int val, int limit)
+gen_values(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int limit)
 {
   int n = 0;
   int first = 1;
@@ -1621,16 +1622,15 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
   if (cursp() >= slimit) slimit = INT16_MAX;
 
   if (!val) {
-    while (t) {
-      codegen(s, t->car, NOVAL);
+    for (size_t i = 0; i < node_count; i++) {
+      codegen(s, nodes[i], NOVAL);
       n++;
-      t = t->cdr;
     }
     return n;
   }
 
-  while (t) {
-    int is_splat = nint(t->car->car) == NODE_SPLAT;
+  for (size_t i = 0; i < node_count; i++) {
+    int is_splat = nodes[i]->type == YP_NODE_SPLAT_NODE;
 
     if (is_splat || cursp() >= slimit) { /* flush stack */
       pop_n(n);
@@ -1652,7 +1652,7 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
       }
       n = 0;
     }
-    codegen(s, t->car, val);
+    codegen(s, nodes[i], val);
     if (is_splat) {
       pop(); pop();
       genop_1(s, OP_ARYCAT, cursp());
@@ -1661,7 +1661,6 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
     else {
       n++;
     }
-    t = t->cdr;
   }
   if (!first) {
     pop();
@@ -1679,6 +1678,7 @@ gen_values(codegen_scope *s, node *t, int val, int limit)
   return n;
 }
 
+#if 0
 static int
 gen_hash(codegen_scope *s, node *tree, int val, int limit)
 {
@@ -2848,12 +2848,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
   }
 
-#if 0
-  case NODE_ARRAY:
+  case YP_NODE_ARRAY_NODE:
     {
+      yp_array_node_t *array = (yp_array_node_t*)node;
       int n;
 
-      n = gen_values(s, tree, val, 0);
+      n = gen_values(s, array->elements.nodes, array->elements.size, val, 0);
       if (val) {
         if (n >= 0) {
           pop_n(n);
@@ -2864,6 +2864,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_HASH:
   case NODE_KW_HASH:
     {
