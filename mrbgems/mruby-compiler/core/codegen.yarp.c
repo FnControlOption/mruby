@@ -1070,7 +1070,6 @@ new_litbint(codegen_scope *s, const char *p, int base, mrb_bool neg)
   return i;
 }
 
-#if 0
 static int
 new_lit_str(codegen_scope *s, const char *str, mrb_int len)
 {
@@ -1104,6 +1103,7 @@ new_lit_str(codegen_scope *s, const char *str, mrb_int len)
   return i;
 }
 
+#if 0
 static int
 new_lit_cstr(codegen_scope *s, const char *str)
 {
@@ -3456,11 +3456,13 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
+#endif
 
-  case NODE_STR:
+  case YP_NODE_STRING_NODE:
     if (val) {
-      char *p = (char*)tree->car;
-      mrb_int len = nint(tree->cdr);
+      yp_string_node_t *string = (yp_string_node_t*)node;
+      const char *p = string->content.start;
+      mrb_int len = string->content.end - p;
       int off = new_lit_str(s, p, len);
 
       genop_2(s, OP_STRING, cursp(), off);
@@ -3468,6 +3470,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_HEREDOC:
     tree = ((struct mrb_parser_heredoc_info*)tree)->doc;
     /* fall through */
