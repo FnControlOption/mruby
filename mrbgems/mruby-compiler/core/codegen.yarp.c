@@ -16,7 +16,9 @@
 #include <mruby/string.h>
 #include <mruby/debug.h>
 #include <mruby/presym.h>
+#if 0
 #include "node.h"
+#endif
 #include <mruby/opcode.h>
 #include <mruby/re.h>
 #include <mruby/throw.h>
