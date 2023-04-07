@@ -31,6 +31,8 @@ MRB_INLINE mrb_sym yarp_sym(mrb_state *mrb, yp_token_t token)
 { return mrb_intern(mrb, token.start, token.end - token.start); }
 MRB_INLINE mrb_sym yarp_sym2(mrb_state *mrb, yp_location_t location)
 { return mrb_intern(mrb, location.start, location.end - location.start); }
+MRB_INLINE mrb_sym yarp_sym3(mrb_state *mrb, const yp_string_t *string)
+{ return mrb_intern(mrb, yp_string_source(string), yp_string_length(string)); }
 
 #ifndef MRB_CODEGEN_LEVEL_MAX
 #define MRB_CODEGEN_LEVEL_MAX 256
@@ -2334,15 +2336,13 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 #endif
   int rlev = s->rlev;
 
-#if 0
-  if (!tree) {
+  if (!node) {
     if (val) {
       genop_1(s, OP_LOADNIL, cursp());
       push();
     }
     return;
   }
-#endif
 
   s->rlev++;
   if (s->rlev > MRB_CODEGEN_LEVEL_MAX) {
@@ -2518,39 +2518,61 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       push();
     }
     break;
+#endif
 
-  case NODE_IF:
+  case YP_NODE_IF_NODE:
+  case YP_NODE_UNLESS_NODE:
     {
       uint32_t pos1, pos2;
       mrb_bool nil_p = FALSE;
-      node *elsepart = tree->cdr->cdr->car;
+      yp_node_t *predicate;
+      yp_node_t *statements = NULL;
+      yp_node_t *consequent = NULL;
+      if (node->type == YP_NODE_IF_NODE) {
+        yp_if_node_t *ifnode = (yp_if_node_t*)node;
+        predicate = ifnode->predicate;
+        statements = (yp_node_t*)ifnode->statements;
+        if (ifnode->consequent) {
+          /*mrb_*/assert(ifnode->consequent->type == YP_NODE_ELSE_NODE);
+          yp_else_node_t *elsenode = (yp_else_node_t*)ifnode->consequent;
+          consequent = (yp_node_t*)elsenode->statements;
+        }
+      } else {
+        yp_unless_node_t *unless = (yp_unless_node_t*)node;
+        predicate = unless->predicate;
+        consequent = (yp_node_t*)unless->statements;
+        if (unless->consequent)
+          statements = (yp_node_t*)unless->consequent->statements;
+      }
 
-      if (!tree->car) {
-        codegen(s, elsepart, val);
+      if (!predicate) {
+        codegen(s, consequent, val);
         goto exit;
       }
-      if (true_always(tree->car)) {
-        codegen(s, tree->cdr->car, val);
+      if (true_always(predicate)) {
+        codegen(s, statements, val);
         goto exit;
       }
-      if (false_always(tree->car)) {
-        codegen(s, elsepart, val);
+      if (false_always(predicate)) {
+        codegen(s, consequent, val);
         goto exit;
       }
-      if (nint(tree->car->car) == NODE_CALL) {
-        node *n = tree->car->cdr;
-        mrb_sym mid = nsym(n->cdr->car);
+      if (predicate->type == YP_NODE_CALL_NODE) {
+        yp_call_node_t *call = (yp_call_node_t*)predicate;
+        mrb_sym mid = yarp_sym3(s->mrb, &call->name);
         mrb_sym sym_nil_p = MRB_SYM_Q_2(s->mrb, nil);
-        if (mid == sym_nil_p && n->cdr->cdr->car == NULL) {
+        if (call->receiver != NULL &&
+            call->call_operator.end - call->call_operator.start == 1 &&
+            mid == sym_nil_p && call->arguments == NULL) {
           nil_p = TRUE;
-          codegen(s, n->car, VAL);
+          codegen(s, call->receiver, VAL);
         }
       }
       if (!nil_p) {
-        codegen(s, tree->car, VAL);
+        codegen(s, predicate, VAL);
       }
       pop();
-      if (val || tree->cdr->car) {
+      if (val || statements) {
         if (nil_p) {
           pos2 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
           pos1 = genjmp_0(s, OP_JMP);
@@ -2559,12 +2581,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         else {
           pos1 = genjmp2_0(s, OP_JMPNOT, cursp(), val);
         }
-        codegen(s, tree->cdr->car, val);
+        codegen(s, statements, val);
         if (val) pop();
-        if (elsepart || val) {
+        if (consequent || val) {
           pos2 = genjmp_0(s, OP_JMP);
           dispatch(s, pos1);
-          codegen(s, elsepart, val);
+          codegen(s, consequent, val);
           dispatch(s, pos2);
         }
         else {
@@ -2572,14 +2594,14 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         }
       }
       else {                    /* empty then-part */
-        if (elsepart) {
+        if (consequent) {
           if (nil_p) {
             pos1 = genjmp2_0(s, OP_JMPNIL, cursp(), val);
           }
           else {
             pos1 = genjmp2_0(s, OP_JMPIF, cursp(), val);
           }
-          codegen(s, elsepart, val);
+          codegen(s, consequent, val);
           dispatch(s, pos1);
         }
         else if (val && !nil_p) {
@@ -2589,7 +2611,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
-#endif
 
   case YP_NODE_AND_NODE:
     {
