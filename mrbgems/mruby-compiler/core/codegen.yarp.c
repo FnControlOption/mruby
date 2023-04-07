@@ -3743,39 +3743,44 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_CLASS:
+  case YP_NODE_CLASS_NODE:
     {
+      yp_class_node_t *class = (yp_class_node_t*)node;
+      yp_constant_path_node_t *path = NULL;
+      yp_node_t *name = class->constant_path;
+      if (name->type == YP_NODE_CONSTANT_PATH_NODE) {
+        path = (yp_constant_path_node_t*)name;
+        name = path->child;
+      }
+      /*mrb_*/assert(name->type == YP_NODE_CONSTANT_READ_NODE);
       int idx;
-      node *body;
 
-      if (tree->car->car == (node*)0) {
+      if (path && path->parent == NULL) {
         genop_1(s, OP_LOADNIL, cursp());
         push();
       }
-      else if (tree->car->car == (node*)1) {
+      else if (path == NULL) {
         genop_1(s, OP_OCLASS, cursp());
         push();
       }
       else {
-        codegen(s, tree->car->car, VAL);
+        codegen(s, path->parent, VAL);
       }
-      if (tree->cdr->car) {
-        codegen(s, tree->cdr->car, VAL);
+      if (class->superclass) {
+        codegen(s, class->superclass, VAL);
       }
       else {
         genop_1(s, OP_LOADNIL, cursp());
         push();
       }
       pop(); pop();
-      idx = new_sym(s, nsym(tree->car->cdr));
+      idx = new_sym(s, yarp_sym2(s->mrb, name->location));
       genop_2(s, OP_CLASS, cursp(), idx);
-      body = tree->cdr->cdr->car;
-      if (nint(body->cdr->car) == NODE_BEGIN && body->cdr->cdr == NULL) {
+      if (class->statements == NULL) {
         genop_1(s, OP_LOADNIL, cursp());
       }
       else {
-        idx = scope_body(s, body, val);
+        idx = scope_body(s, class->scope, class->statements, val);
         genop_2(s, OP_EXEC, cursp(), idx);
       }
       if (val) {
@@ -3784,30 +3789,37 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-  case NODE_MODULE:
+  case YP_NODE_MODULE_NODE:
     {
+      yp_module_node_t *module = (yp_module_node_t*)node;
+      yp_constant_path_node_t *path = NULL;
+      yp_node_t *name = module->constant_path;
+      if (name->type == YP_NODE_CONSTANT_PATH_NODE) {
+        path = (yp_constant_path_node_t*)name;
+        name = path->child;
+      }
+      /*mrb_*/assert(name->type == YP_NODE_CONSTANT_READ_NODE);
       int idx;
 
-      if (tree->car->car == (node*)0) {
+      if (path && path->parent == NULL) {
         genop_1(s, OP_LOADNIL, cursp());
         push();
       }
-      else if (tree->car->car == (node*)1) {
+      else if (path == NULL) {
         genop_1(s, OP_OCLASS, cursp());
         push();
       }
       else {
-        codegen(s, tree->car->car, VAL);
+        codegen(s, path->parent, VAL);
       }
       pop();
-      idx = new_sym(s, nsym(tree->car->cdr));
+      idx = new_sym(s, yarp_sym2(s->mrb, name->location));
       genop_2(s, OP_MODULE, cursp(), idx);
-      if (nint(tree->cdr->car->cdr->car) == NODE_BEGIN &&
-          tree->cdr->car->cdr->cdr == NULL) {
+      if (module->statements == NULL) {
         genop_1(s, OP_LOADNIL, cursp());
       }
       else {
-        idx = scope_body(s, tree->cdr->car, val);
+        idx = scope_body(s, module->scope, module->statements, val);
         genop_2(s, OP_EXEC, cursp(), idx);
       }
       if (val) {
@@ -3815,7 +3827,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
-#endif
 
   case YP_NODE_SINGLETON_CLASS_NODE:
     {
