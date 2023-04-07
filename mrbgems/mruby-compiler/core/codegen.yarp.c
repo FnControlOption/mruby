@@ -961,6 +961,7 @@ gen_binop(codegen_scope *s, mrb_sym op, uint16_t dst)
     return TRUE;
   }
 }
+#endif
 
 static uint32_t
 dispatch(codegen_scope *s, uint32_t pos0)
@@ -983,6 +984,7 @@ dispatch(codegen_scope *s, uint32_t pos0)
   return pos1+newpos;
 }
 
+#if 0
 static void
 dispatch_linked(codegen_scope *s, uint32_t pos)
 {
@@ -2250,15 +2252,16 @@ gen_retval(codegen_scope *s, node *tree)
     pop();
   }
 }
+#endif
 
 static mrb_bool
-true_always(node *tree)
+true_always(yp_node_t *node)
 {
-  switch (nint(tree->car)) {
-  case NODE_TRUE:
-  case NODE_INT:
-  case NODE_STR:
-  case NODE_SYM:
+  switch (node->type) {
+  case YP_NODE_TRUE_NODE:
+  case YP_NODE_INTEGER_NODE:
+  case YP_NODE_STRING_NODE:
+  case YP_NODE_SYMBOL_NODE:
     return TRUE;
   default:
     return FALSE;
@@ -2266,17 +2269,18 @@ true_always(node *tree)
 }
 
 static mrb_bool
-false_always(node *tree)
+false_always(yp_node_t *node)
 {
-  switch (nint(tree->car)) {
-  case NODE_FALSE:
-  case NODE_NIL:
+  switch (node->type) {
+  case YP_NODE_FALSE_NODE:
+  case YP_NODE_NIL_NODE:
     return TRUE;
   default:
     return FALSE;
   }
 }
 
+#if 0
 static void
 gen_blkmove(codegen_scope *s, uint16_t ainfo, int lv)
 {
@@ -2558,47 +2562,51 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
+#endif
 
-  case NODE_AND:
+  case YP_NODE_AND_NODE:
     {
+      yp_and_node_t *and = (yp_and_node_t*)node;
       uint32_t pos;
 
-      if (true_always(tree->car)) {
-        codegen(s, tree->cdr, val);
+      if (true_always(and->left)) {
+        codegen(s, and->right, val);
         goto exit;
       }
-      if (false_always(tree->car)) {
-        codegen(s, tree->car, val);
+      if (false_always(and->left)) {
+        codegen(s, and->left, val);
         goto exit;
       }
-      codegen(s, tree->car, VAL);
+      codegen(s, and->left, VAL);
       pop();
       pos = genjmp2_0(s, OP_JMPNOT, cursp(), val);
-      codegen(s, tree->cdr, val);
+      codegen(s, and->right, val);
       dispatch(s, pos);
     }
     break;
 
-  case NODE_OR:
+  case YP_NODE_OR_NODE:
     {
+      yp_or_node_t *or = (yp_or_node_t*)node;
       uint32_t pos;
 
-      if (true_always(tree->car)) {
-        codegen(s, tree->car, val);
+      if (true_always(or->left)) {
+        codegen(s, or->left, val);
         goto exit;
       }
-      if (false_always(tree->car)) {
-        codegen(s, tree->cdr, val);
+      if (false_always(or->left)) {
+        codegen(s, or->right, val);
         goto exit;
       }
-      codegen(s, tree->car, VAL);
+      codegen(s, or->left, VAL);
       pop();
       pos = genjmp2_0(s, OP_JMPIF, cursp(), val);
-      codegen(s, tree->cdr, val);
+      codegen(s, or->right, val);
       dispatch(s, pos);
     }
     break;
 
+#if 0
   case NODE_WHILE:
   case NODE_UNTIL:
     {
