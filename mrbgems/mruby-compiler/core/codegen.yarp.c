@@ -121,7 +121,7 @@ static void loop_pop(codegen_scope *s, int val);
 static int catch_handler_new(codegen_scope *s);
 static void catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t begin, uint32_t end, uint32_t target);
 
-static void gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val);
+static void gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int val);
 static void gen_massignment(codegen_scope *s, node *tree, int sp, int val);
 
 static void codegen(codegen_scope *s, yp_node_t *node, int val);
@@ -1189,7 +1189,6 @@ new_sym(codegen_scope *s, mrb_sym sym)
   return s->irep->slen++;
 }
 
-#if 0
 static void
 gen_setxv(codegen_scope *s, uint8_t op, uint16_t dst, mrb_sym sym, int val)
 {
@@ -1203,7 +1202,6 @@ gen_setxv(codegen_scope *s, uint8_t op, uint16_t dst, mrb_sym sym, int val)
   }
   genop_2(s, op, dst, idx);
 }
-#endif
 
 static void
 gen_int(codegen_scope *s, uint16_t dst, mrb_int i)
@@ -1263,6 +1261,7 @@ node_len(node *tree)
   }
   return n;
 }
+#endif
 
 #define nint(x) ((int)(intptr_t)(x))
 #define nchar(x) ((char)(intptr_t)(x))
@@ -1273,13 +1272,12 @@ node_len(node *tree)
 static int
 lv_idx(codegen_scope *s, mrb_sym id)
 {
-  node *lv = s->lv;
+  yp_scope_node_t *lv = s->lv;
   int n = 1;
 
-  while (lv) {
-    if (lv_name(lv) == id) return n;
+  for (size_t i = 0; i < lv->locals.size; i++) {
+    if (yarp_sym(s->mrb, lv->locals.tokens[i]) == id) return n;
     n++;
-    lv = lv->cdr;
   }
   return 0;
 }
@@ -1301,7 +1299,7 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
   }
 
   if (lv < 1) lv = 1;
-  u = s->parser->upper;
+  u = s->cxt->upper;
   while (u && !MRB_PROC_CFUNC_P(u)) {
     const struct mrb_irep *ir = u->body.irep;
     uint_fast16_t n = ir->nlocals;
@@ -1336,6 +1334,7 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
   return -1; /* not reached */
 }
 
+#if 0
 static void
 for_body(codegen_scope *s, node *tree)
 {
@@ -1845,22 +1844,27 @@ gen_call(codegen_scope *s, node *tree, int val, int safe)
     push();
   }
 }
+#endif
 
 static void
-gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
+gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int val)
 {
+  mrb_sym name;
   int idx;
-  int type = nint(tree->car);
 
-  switch (type) {
-  case NODE_GVAR:
+  switch (node->type) {
+  case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
+#if 0
   case NODE_ARG:
-  case NODE_LVAR:
-  case NODE_IVAR:
-  case NODE_CVAR:
+#endif
+  case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
+  case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
+  case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
+#if 0
   case NODE_CONST:
   case NODE_NIL:
   case NODE_MASGN:
+#endif
     if (rhs) {
       codegen(s, rhs, VAL);
       pop();
@@ -1868,6 +1872,7 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
     }
     break;
 
+#if 0
   case NODE_COLON2:
   case NODE_COLON3:
   case NODE_CALL:
@@ -1879,20 +1884,24 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
     /* never happens; should have already checked in the parser */
     codegen_error(s, "Can't assign to numbered parameter");
     break;
+#endif
 
   default:
     codegen_error(s, "unknown lhs");
     break;
   }
 
-  tree = tree->cdr;
-  switch (type) {
-  case NODE_GVAR:
-    gen_setxv(s, OP_SETGV, sp, nsym(tree), val);
+  switch (node->type) {
+  case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
+    name = yarp_sym(s->mrb, ((yp_global_variable_write_node_t*)node)->name);
+    gen_setxv(s, OP_SETGV, sp, name, val);
     break;
+#if 0
   case NODE_ARG:
-  case NODE_LVAR:
-    idx = lv_idx(s, nsym(tree));
+#endif
+  case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
+    name = yarp_sym2(s->mrb, ((yp_local_variable_write_node_t*)node)->name_loc);
+    idx = lv_idx(s, name);
     if (idx > 0) {
       if (idx != sp) {
         gen_move(s, idx, sp, val);
@@ -1900,15 +1909,18 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
       break;
     }
     else {                      /* upvar */
-      gen_setupvar(s, sp, nsym(tree));
+      gen_setupvar(s, sp, name);
     }
     break;
-  case NODE_IVAR:
-    gen_setxv(s, OP_SETIV, sp, nsym(tree), val);
+  case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
+    name = yarp_sym2(s->mrb, ((yp_instance_variable_write_node_t*)node)->name_loc);
+    gen_setxv(s, OP_SETIV, sp, name, val);
     break;
-  case NODE_CVAR:
-    gen_setxv(s, OP_SETCV, sp, nsym(tree), val);
+  case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
+    name = yarp_sym2(s->mrb, ((yp_class_variable_write_node_t*)node)->name_loc);
+    gen_setxv(s, OP_SETCV, sp, name, val);
     break;
+#if 0
   case NODE_CONST:
     gen_setxv(s, OP_SETCONST, sp, nsym(tree), val);
     break;
@@ -2034,6 +2046,7 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
   /* splat without assignment */
   case NODE_NIL:
     break;
+#endif
 
   default:
     codegen_error(s, "unknown lhs");
@@ -2042,6 +2055,7 @@ gen_assignment(codegen_scope *s, node *tree, node *rhs, int sp, int val)
   if (val) push();
 }
 
+#if 0
 static void
 gen_massignment(codegen_scope *s, node *tree, int rhs, int val)
 {
@@ -2810,11 +2824,22 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case NODE_SPLAT:
     codegen(s, tree, val);
     break;
+#endif
 
-  case NODE_ASGN:
-    gen_assignment(s, tree->car, tree->cdr, 0, val);
+  case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
+    gen_assignment(s, node, ((yp_global_variable_write_node_t*)node)->value, 0, val);
+    break;
+  case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
+    gen_assignment(s, node, ((yp_local_variable_write_node_t*)node)->value, 0, val);
+    break;
+  case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
+    gen_assignment(s, node, ((yp_instance_variable_write_node_t*)node)->value, 0, val);
+    break;
+  case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
+    gen_assignment(s, node, ((yp_class_variable_write_node_t*)node)->value, 0, val);
     break;
 
+#if 0
   case NODE_MASGN:
     {
       int len = 0, n = 0, post = 0;
