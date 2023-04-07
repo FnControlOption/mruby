@@ -1861,7 +1861,6 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
   case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
   case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
 #if 0
-  case NODE_CONST:
   case NODE_NIL:
   case NODE_MASGN:
 #endif
@@ -1872,14 +1871,15 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
     }
     break;
 
+  case YP_NODE_CONSTANT_PATH_WRITE_NODE:
 #if 0
-  case NODE_COLON2:
-  case NODE_COLON3:
   case NODE_CALL:
   case NODE_SCALL:
+#endif
     /* keep evaluation order */
     break;
 
+#if 0
   case NODE_NVAR:
     /* never happens; should have already checked in the parser */
     codegen_error(s, "Can't assign to numbered parameter");
@@ -1920,25 +1920,36 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
     name = yarp_sym2(s->mrb, ((yp_class_variable_write_node_t*)node)->name_loc);
     gen_setxv(s, OP_SETCV, sp, name, val);
     break;
-#if 0
-  case NODE_CONST:
-    gen_setxv(s, OP_SETCONST, sp, nsym(tree), val);
-    break;
-  case NODE_COLON2:
-  case NODE_COLON3:
+  case YP_NODE_CONSTANT_PATH_WRITE_NODE: {
+    yp_constant_path_write_node_t *write = (yp_constant_path_write_node_t*)node;
+    yp_node_t *target = write->target;
+    if (target->type == YP_NODE_CONSTANT_READ_NODE) {
+      if (rhs) {
+        codegen(s, rhs, VAL);
+        pop();
+        sp = cursp();
+      }
+      name = yarp_sym2(s->mrb, target->location);
+      gen_setxv(s, OP_SETCONST, sp, name, val);
+      break;
+    }
+    /*mrb_*/assert(target->type == YP_NODE_CONSTANT_PATH_NODE);
+    yp_constant_path_node_t *path = (yp_constant_path_node_t*)target;
+    /*mrb_*/assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
+    name = yarp_sym2(s->mrb, path->child->location);
     if (sp) {
       gen_move(s, cursp(), sp, 0);
     }
     sp = cursp();
     push();
-    if (type == NODE_COLON2) {
-      codegen(s, tree->car, VAL);
-      idx = new_sym(s, nsym(tree->cdr));
+    if (path->parent) {
+      codegen(s, path->parent, VAL);
+      idx = new_sym(s, name);
     }
-    else {   /* NODE_COLON3 */
+    else {
       genop_1(s, OP_OCLASS, cursp());
       push();
-      idx = new_sym(s, nsym(tree));
+      idx = new_sym(s, name);
     }
     if (rhs) {
       codegen(s, rhs, VAL); pop();
@@ -1947,7 +1958,9 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
     pop_n(2);
     genop_2(s, OP_SETMCNST, sp, idx);
     break;
+  }
 
+#if 0
   case NODE_CALL:
   case NODE_SCALL:
     {
@@ -2837,6 +2850,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
   case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
     gen_assignment(s, node, ((yp_class_variable_write_node_t*)node)->value, 0, val);
+    break;
+  case YP_NODE_CONSTANT_PATH_WRITE_NODE:
+    gen_assignment(s, node, ((yp_constant_path_write_node_t*)node)->value, 0, val);
     break;
 
 #if 0
