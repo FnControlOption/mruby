@@ -2772,7 +2772,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
   case YP_NODE_PROGRAM_NODE: {
     yp_program_node_t *program = (yp_program_node_t*)node;
-    scope_body(s, program->scope, &program->statements->base, NOVAL);
+    scope_body(s, program->scope, (yp_node_t*)program->statements, NOVAL);
     break;
   }
 
