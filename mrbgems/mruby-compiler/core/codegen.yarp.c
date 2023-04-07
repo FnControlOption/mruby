@@ -1275,7 +1275,7 @@ lv_idx(codegen_scope *s, mrb_sym id)
   yp_scope_node_t *lv = s->lv;
   int n = 1;
 
-  for (size_t i = 0; i < lv->locals.size; i++) {
+  for (size_t i = 0; lv && i < lv->locals.size; i++) {
     if (yarp_sym(s->mrb, lv->locals.tokens[i]) == id) return n;
     n++;
   }
