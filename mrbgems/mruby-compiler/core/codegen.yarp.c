@@ -911,7 +911,6 @@ gen_muldiv(codegen_scope *s, uint8_t op, uint16_t dst)
 
 mrb_bool mrb_num_shift(mrb_state *mrb, mrb_int val, mrb_int width, mrb_int *num);
 
-#if 0
 static mrb_bool
 gen_binop(codegen_scope *s, mrb_sym op, uint16_t dst)
 {
@@ -967,7 +966,6 @@ gen_binop(codegen_scope *s, mrb_sym op, uint16_t dst)
     return TRUE;
   }
 }
-#endif
 
 static uint32_t
 dispatch(codegen_scope *s, uint32_t pos0)
@@ -1225,7 +1223,6 @@ gen_int(codegen_scope *s, uint16_t dst, mrb_int i)
   }
 }
 
-#if 0
 static mrb_bool
 gen_uniop(codegen_scope *s, mrb_sym sym, uint16_t dst)
 {
@@ -1252,6 +1249,7 @@ gen_uniop(codegen_scope *s, mrb_sym sym, uint16_t dst)
   return TRUE;
 }
 
+#if 0
 static int
 node_len(node *tree)
 {
@@ -1733,43 +1731,52 @@ gen_hash(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int li
   return len;
 }
 
-#if 0
 static void
-gen_call(codegen_scope *s, node *tree, int val, int safe)
+gen_call(codegen_scope *s, yp_call_node_t *node, int val)
 {
-  mrb_sym sym = nsym(tree->cdr->car);
+  mrb_sym sym = yarp_sym3(s->mrb, &node->name);
   int skip = 0, n = 0, nk = 0, noop = no_optimize(s), noself = 0, blk = 0, sp_save = cursp();
 
-  if (!tree->car) {
+  if (!node->receiver) {
     noself = noop = 1;
     push();
   }
   else {
-    codegen(s, tree->car, VAL); /* receiver */
+    codegen(s, node->receiver, VAL); /* receiver */
   }
-  if (safe) {
+  if (yarp_safe_call_p(node)) {
     int recv = cursp()-1;
     gen_move(s, cursp(), recv, 1);
     skip = genjmp2_0(s, OP_JMPNIL, cursp(), val);
   }
-  tree = tree->cdr->cdr->car;
-  if (tree) {
-    if (tree->car) {            /* positional arguments */
-      n = gen_values(s, tree->car, VAL, 14);
+  if (node->arguments) {
+    yp_node_list_t arguments = node->arguments->arguments;
+    size_t argc = arguments.size;
+    /*mrb_*/assert(argc > 0);
+    yp_hash_node_t *kwargs = NULL;
+    if (arguments.nodes[argc - 1]->type == YP_NODE_HASH_NODE) {
+      yp_hash_node_t *hash = (yp_hash_node_t*)arguments.nodes[argc - 1];
+      if (hash->opening.type == YP_TOKEN_NOT_PROVIDED) {
+        argc -= 1;
+        kwargs = hash;
+      }
+    }
+    if (argc > 0) {             /* positional arguments */
+      n = gen_values(s, arguments.nodes, argc, VAL, 14);
       if (n < 0) {              /* variable length */
         noop = 1;               /* not operator */
         n = 15;
         push();
       }
     }
-    if (tree->cdr->car) {       /* keyword arguments */
+    if (kwargs) {               /* keyword arguments */
       noop = 1;
-      nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
+      nk = gen_hash(s, kwargs->elements.nodes, kwargs->elements.size, VAL, 14);
       if (nk < 0) nk = 15;
     }
   }
-  if (tree && tree->cdr && tree->cdr->cdr) {
-    codegen(s, tree->cdr->cdr, VAL);
+  if (node->block) {
+    codegen(s, (yp_node_t*)node->block, VAL);
     pop();
     noop = 1;
     blk = 1;
@@ -1818,14 +1825,13 @@ gen_call(codegen_scope *s, node *tree, int val, int safe)
   else {
     genop_3(s, blk ? OP_SENDB : OP_SEND, cursp(), new_sym(s, sym), n|(nk<<4));
   }
-  if (safe) {
+  if (yarp_safe_call_p(node)) {
     dispatch(s, skip);
   }
   if (val) {
     push();
   }
 }
-#endif
 
 static void
 gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int val)
@@ -2512,16 +2518,18 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_BLOCK:
+  case YP_NODE_BLOCK_NODE:
     if (val) {
-      int idx = lambda_body(s, tree, 1);
+      yp_block_node_t *block = (yp_block_node_t*)node;
+      yp_parameters_node_t *parameters = NULL;
+      if (block->parameters)
+        parameters = block->parameters->parameters;
+      int idx = lambda_body(s, block->scope, parameters, block->statements, 1);
 
       genop_2(s, OP_BLOCK, cursp(), idx);
       push();
     }
     break;
-#endif
 
   case YP_NODE_IF_NODE:
   case YP_NODE_UNLESS_NODE:
@@ -2800,15 +2808,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
   }
 
-#if 0
-  case NODE_FCALL:
-  case NODE_CALL:
-    gen_call(s, tree, val, 0);
+  case YP_NODE_CALL_NODE:
+    gen_call(s, (yp_call_node_t*)node, val);
     break;
-  case NODE_SCALL:
-    gen_call(s, tree, val, 1);
-    break;
-#endif
 
   case YP_NODE_RANGE_NODE: {
     yp_range_node_t *range = (yp_range_node_t*)node;
