@@ -3342,21 +3342,24 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
+#endif
 
-  case NODE_LVAR:
+  case YP_NODE_LOCAL_VARIABLE_READ_NODE:
     if (val) {
-      int idx = lv_idx(s, nsym(tree));
+      mrb_sym name = yarp_sym2(s->mrb, node->location);
+      int idx = lv_idx(s, name);
 
       if (idx > 0) {
         gen_move(s, cursp(), idx, val);
       }
       else {
-        gen_getupvar(s, cursp(), nsym(tree));
+        gen_getupvar(s, cursp(), name);
       }
       push();
     }
     break;
 
+#if 0
   case NODE_NVAR:
     if (val) {
       int idx = nint(tree);
