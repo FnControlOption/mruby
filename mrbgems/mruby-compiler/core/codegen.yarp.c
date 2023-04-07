@@ -1376,12 +1376,11 @@ for_body(codegen_scope *s, yp_for_node_t *node)
   genop_3(s, OP_SENDB, cursp(), idx, 0);
 }
 
-#if 0
 static int
-lambda_body(codegen_scope *s, node *tree, int blk)
+lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parameters, yp_node_t *statements, int blk)
 {
   codegen_scope *parent = s;
-  s = scope_new(s->mrb, s, tree->car);
+  s = scope_new(s->mrb, s->cxt, s, nlv);
 
   s->mscope = !blk;
 
@@ -1389,8 +1388,7 @@ lambda_body(codegen_scope *s, node *tree, int blk)
     struct loopinfo *lp = loop_push(s, LOOP_BLOCK);
     lp->pc0 = new_label(s);
   }
-  tree = tree->cdr;
-  if (tree->car == NULL) {
+  if (parameters == NULL) {
     genop_W(s, OP_ENTER, 0);
     s->ainfo = 0;
   }
@@ -1398,28 +1396,27 @@ lambda_body(codegen_scope *s, node *tree, int blk)
     mrb_aspec a;
     int ma, oa, ra, pa, ka, kd, ba, i;
     uint32_t pos;
-    node *opt;
-    node *margs, *pargs;
-    node *tail;
+    yp_node_t **margs, **oargs, **pargs, **kargs;
 
     /* mandatory arguments */
-    ma = node_len(tree->car->car);
-    margs = tree->car->car;
-    tail = tree->car->cdr->cdr->cdr->cdr;
+    ma = parameters->requireds.size;
+    margs = parameters->requireds.nodes;
 
     /* optional arguments */
-    oa = node_len(tree->car->cdr->car);
+    oa = parameters->optionals.size;
+    oargs = parameters->optionals.nodes;
     /* rest argument? */
-    ra = tree->car->cdr->cdr->car ? 1 : 0;
+    ra = parameters->rest ? 1 : 0;
     /* mandatory arguments after rest argument */
-    pa = node_len(tree->car->cdr->cdr->cdr->car);
-    pargs = tree->car->cdr->cdr->cdr->car;
+    pa = parameters->posts.size;
+    pargs = parameters->posts.nodes;
     /* keyword arguments */
-    ka = tail? node_len(tail->cdr->car) : 0;
+    ka = parameters->keywords.size;
+    kargs = parameters->keywords.nodes;
     /* keyword dictionary? */
-    kd = tail && tail->cdr->cdr->car? 1 : 0;
+    kd = parameters->keyword_rest ? 1 : 0;
     /* block argument? */
-    ba = tail && tail->cdr->cdr->cdr->car ? 1 : 0;
+    ba = parameters->block ? 1 : 0;
 
     if (ma > 0x1f || oa > 0x1f || pa > 0x1f || ka > 0x1f) {
       codegen_error(s, "too many formal arguments");
@@ -1446,14 +1443,14 @@ lambda_body(codegen_scope *s, node *tree, int blk)
     if (oa > 0) {
       genjmp_0(s, OP_JMP);
     }
-    opt = tree->car->cdr->car;
-    i = 0;
-    while (opt) {
+    for (i=0; i<oa; i++) {
       int idx;
-      mrb_sym id = nsym(opt->car->car);
+      /*mrb_*/assert(oargs[i]->type == YP_NODE_OPTIONAL_PARAMETER_NODE);
+      yp_optional_parameter_node_t *parameter = (yp_optional_parameter_node_t*)oargs[i];
+      mrb_sym id = yarp_sym(s->mrb, parameter->name);
 
       dispatch(s, pos+i*3+1);
-      codegen(s, opt->car->cdr, VAL);
+      codegen(s, parameter->value, VAL);
       pop();
       idx = lv_idx(s, id);
       if (idx > 0) {
@@ -1462,30 +1459,19 @@ lambda_body(codegen_scope *s, node *tree, int blk)
       else {
         gen_getupvar(s, cursp(), id);
       }
-      i++;
-      opt = opt->cdr;
     }
     if (oa > 0) {
       dispatch(s, pos+i*3+1);
     }
 
     /* keyword arguments */
-    if (tail) {
-      node *kwds = tail->cdr->car;
-      int kwrest = 0;
-
-      if (tail->cdr->cdr->car) {
-        kwrest = 1;
-      }
-      mrb_assert(nint(tail->car) == NODE_ARGS_TAIL);
-      mrb_assert(node_len(tail) == 4);
-
-      while (kwds) {
+    if (ka > 0 || kd) {
+      for (int j=0; j<ka; j++) {
         int jmpif_key_p, jmp_def_set = -1;
-        node *kwd = kwds->car, *def_arg = kwd->cdr->cdr->car;
-        mrb_sym kwd_sym = nsym(kwd->cdr->car);
-
-        mrb_assert(nint(kwd->car) == NODE_KW_ARG);
+        /*mrb_*/assert(kargs[j]->type == YP_NODE_KEYWORD_PARAMETER_NODE);
+        yp_keyword_parameter_node_t *kwd = (yp_keyword_parameter_node_t*)kargs[j];
+        yp_node_t *def_arg = kwd->value;
+        mrb_sym kwd_sym = yarp_sym(s->mrb, (yp_token_t){.type = kwd->name.type, .start = kwd->name.start, .end = kwd->name.end - 1}); // TODO: Submit YARP PR
 
         if (def_arg) {
           int idx;
@@ -1508,42 +1494,34 @@ lambda_body(codegen_scope *s, node *tree, int blk)
           dispatch(s, jmp_def_set);
         }
         i++;
-
-        kwds = kwds->cdr;
       }
-      if (tail->cdr->car && !kwrest) {
+      if (ka > 0 && !kd) {
         genop_0(s, OP_KEYEND);
       }
     }
 
     /* argument destructuring */
-    if (margs) {
-      node *n = margs;
-
+    if (ma > 0) {
       pos = 1;
-      while (n) {
-        if (nint(n->car->car) == NODE_MASGN) {
-          gen_massignment(s, n->car->cdr->car, pos, NOVAL);
+      for (int j=0; j<ma; j++) {
+        if (margs[j]->type == YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE) {
+          gen_massignment(s, ((yp_required_destructured_parameter_node_t*)margs[j])->parameters, pos, NOVAL);
         }
         pos++;
-        n = n->cdr;
       }
     }
-    if (pargs) {
-      node *n = pargs;
-
+    if (pa > 0) {
       pos = ma+oa+ra+1;
-      while (n) {
-        if (nint(n->car->car) == NODE_MASGN) {
-          gen_massignment(s, n->car->cdr->car, pos, NOVAL);
+      for (int j=0; j<pa; j++) {
+        if (pargs[j]->type == YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE) {
+          gen_massignment(s, ((yp_required_destructured_parameter_node_t*)pargs[j])->parameters, pos, NOVAL);
         }
         pos++;
-        n = n->cdr;
       }
     }
   }
 
-  codegen(s, tree->cdr->car, VAL);
+  codegen(s, statements, VAL);
   pop();
   if (s->pc > 0) {
     gen_return(s, OP_RETURN, cursp());
@@ -1554,7 +1532,6 @@ lambda_body(codegen_scope *s, node *tree, int blk)
   scope_finish(s);
   return parent->irep->rlen - 1;
 }
-#endif
 
 static int
 scope_body(codegen_scope *s, yp_scope_node_t *nlv, yp_node_t *statements, int val)
@@ -1855,9 +1832,7 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
 
   switch (node->type) {
   case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
-#if 0
-  case NODE_ARG:
-#endif
+  case YP_NODE_REQUIRED_PARAMETER_NODE:
   case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
   case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
   case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
@@ -1907,11 +1882,13 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
     name = yarp_sym(s->mrb, ((yp_global_variable_write_node_t*)node)->name);
     gen_setxv(s, OP_SETGV, sp, name, val);
     break;
-#if 0
-  case NODE_ARG:
-#endif
+  case YP_NODE_REQUIRED_PARAMETER_NODE:
   case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
-    name = yarp_sym2(s->mrb, ((yp_local_variable_write_node_t*)node)->name_loc);
+    if (node->type == YP_NODE_REQUIRED_PARAMETER_NODE) {
+      name = yarp_sym2(s->mrb, node->location);
+    } else {
+      name = yarp_sym2(s->mrb, ((yp_local_variable_write_node_t*)node)->name_loc);
+    }
     idx = lv_idx(s, name);
     if (idx > 0) {
       if (idx != sp) {
@@ -3944,11 +3921,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_DEF:
+  case YP_NODE_DEF_NODE:
     {
-      int sym = new_sym(s, nsym(tree->car));
-      int idx = lambda_body(s, tree->cdr, 0);
+      yp_def_node_t *def = (yp_def_node_t*)node;
+      if (def->receiver != NULL) { fprintf(stderr, "TODO\n"); exit(-1); }
+      int sym = new_sym(s, yarp_sym(s->mrb, def->name));
+      int idx = lambda_body(s, def->scope, def->parameters, def->statements, 0);
 
       genop_1(s, OP_TCLASS, cursp());
       push();
@@ -3960,6 +3938,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_SDEF:
     {
       node *recv = tree->car;
