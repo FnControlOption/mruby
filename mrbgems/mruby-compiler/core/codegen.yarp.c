@@ -988,7 +988,6 @@ dispatch(codegen_scope *s, uint32_t pos0)
   return pos1+newpos;
 }
 
-#if 0
 static void
 dispatch_linked(codegen_scope *s, uint32_t pos)
 {
@@ -998,7 +997,6 @@ dispatch_linked(codegen_scope *s, uint32_t pos)
     if (pos==0) break;
   }
 }
-#endif
 
 #define nregs_update do {if (s->sp > s->nregs) s->nregs = s->sp;} while (0)
 static void
@@ -2654,12 +2652,22 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_WHILE:
-  case NODE_UNTIL:
+  case YP_NODE_WHILE_NODE:
+  case YP_NODE_UNTIL_NODE:
     {
-      if (true_always(tree->car)) {
-        if (nt == NODE_UNTIL) {
+      yp_node_t *predicate;
+      yp_statements_node_t *statements;
+      if (node->type == YP_NODE_WHILE_NODE) {
+        yp_while_node_t *whilenode = (yp_while_node_t*)node;
+        predicate = whilenode->predicate;
+        statements = whilenode->statements;
+      } else {
+        yp_until_node_t *until = (yp_until_node_t*)node;
+        predicate = until->predicate;
+        statements = until->statements;
+      }
+      if (true_always(predicate)) {
+        if (node->type == YP_NODE_UNTIL_NODE) {
           if (val) {
             genop_1(s, OP_LOADNIL, cursp());
             push();
@@ -2667,8 +2675,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
           goto exit;
         }
       }
-      else if (false_always(tree->car)) {
-        if (nt == NODE_WHILE) {
+      else if (false_always(predicate)) {
+        if (node->type == YP_NODE_WHILE_NODE) {
           if (val) {
             genop_1(s, OP_LOADNIL, cursp());
             push();
@@ -2682,22 +2690,23 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
       if (!val) lp->reg = -1;
       lp->pc0 = new_label(s);
-      codegen(s, tree->car, VAL);
+      codegen(s, predicate, VAL);
       pop();
-      if (nt == NODE_WHILE) {
+      if (node->type == YP_NODE_WHILE_NODE) {
         pos = genjmp2_0(s, OP_JMPNOT, cursp(), NOVAL);
       }
       else {
         pos = genjmp2_0(s, OP_JMPIF, cursp(), NOVAL);
       }
       lp->pc1 = new_label(s);
-      codegen(s, tree->cdr, NOVAL);
+      codegen(s, (yp_node_t*)statements, NOVAL);
       genjmp(s, OP_JMP, lp->pc0);
       dispatch(s, pos);
       loop_pop(s, val);
     }
     break;
 
+#if 0
   case NODE_FOR:
     for_body(s, tree);
     if (val) push();
@@ -4108,7 +4117,6 @@ scope_finish(codegen_scope *s)
   mrb_pool_close(s->mpool);
 }
 
-#if 0
 static struct loopinfo*
 loop_push(codegen_scope *s, enum looptype t)
 {
@@ -4123,6 +4131,7 @@ loop_push(codegen_scope *s, enum looptype t)
   return p;
 }
 
+#if 0
 static void
 loop_break(codegen_scope *s, node *tree)
 {
@@ -4181,6 +4190,7 @@ loop_break(codegen_scope *s, node *tree)
     }
   }
 }
+#endif
 
 static void
 loop_pop(codegen_scope *s, int val)
@@ -4193,6 +4203,7 @@ loop_pop(codegen_scope *s, int val)
   if (val) push();
 }
 
+#if 0
 static int
 catch_handler_new(codegen_scope *s)
 {
