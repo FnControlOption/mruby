@@ -1334,37 +1334,36 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
   return -1; /* not reached */
 }
 
-#if 0
 static void
-for_body(codegen_scope *s, node *tree)
+for_body(codegen_scope *s, yp_for_node_t *node)
 {
   codegen_scope *prev = s;
   int idx;
   struct loopinfo *lp;
-  node *n2;
 
   /* generate receiver */
-  codegen(s, tree->cdr->car, VAL);
+  codegen(s, node->collection, VAL);
   /* generate loop-block */
-  s = scope_new(s->mrb, s, NULL);
+  s = scope_new(s->mrb, s->cxt, s, NULL);
 
   push();                       /* push for a block parameter */
 
   /* generate loop variable */
-  n2 = tree->car;
   genop_W(s, OP_ENTER, 0x40000);
-  if (n2->car && !n2->car->cdr && !n2->cdr) {
-    gen_assignment(s, n2->car->car, NULL, 1, NOVAL);
+  /*mrb_*/assert(node->index->type == YP_NODE_MULTI_WRITE_NODE);
+  yp_multi_write_node_t *write = (yp_multi_write_node_t*)node->index;
+  if (write->targets.size == 1) {
+    gen_assignment(s, write->targets.nodes[0], NULL, 1, NOVAL);
   }
   else {
-    gen_massignment(s, n2, 1, VAL);
+    gen_massignment(s, write->targets, 1, VAL);
   }
   /* construct loop */
   lp = loop_push(s, LOOP_FOR);
   lp->pc1 = new_label(s);
 
   /* loop body */
-  codegen(s, tree->cdr->cdr->car, VAL);
+  codegen(s, (yp_node_t*)node->statements, VAL);
   pop();
   gen_return(s, OP_RETURN, cursp());
   loop_pop(s, NOVAL);
@@ -1377,6 +1376,7 @@ for_body(codegen_scope *s, node *tree)
   genop_3(s, OP_SENDB, cursp(), idx, 0);
 }
 
+#if 0
 static int
 lambda_body(codegen_scope *s, node *tree, int blk)
 {
@@ -2725,12 +2725,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_FOR:
-    for_body(s, tree);
+  case YP_NODE_FOR_NODE:
+    for_body(s, (yp_for_node_t*)node);
     if (val) push();
     break;
-#endif
 
   case YP_NODE_CASE_NODE:
     {
