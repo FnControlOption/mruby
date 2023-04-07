@@ -33,6 +33,8 @@ MRB_INLINE mrb_sym yarp_sym2(mrb_state *mrb, yp_location_t location)
 { return mrb_intern(mrb, location.start, location.end - location.start); }
 MRB_INLINE mrb_sym yarp_sym3(mrb_state *mrb, const yp_string_t *string)
 { return mrb_intern(mrb, yp_string_source(string), yp_string_length(string)); }
+MRB_INLINE mrb_bool yarp_safe_call_p(yp_call_node_t *node)
+{ return node->call_operator.type == YP_TOKEN_AMPERSAND_DOT; }
 
 #ifndef MRB_CODEGEN_LEVEL_MAX
 #define MRB_CODEGEN_LEVEL_MAX 256
@@ -2563,7 +2565,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         mrb_sym mid = yarp_sym3(s->mrb, &call->name);
         mrb_sym sym_nil_p = MRB_SYM_Q_2(s->mrb, nil);
         if (call->receiver != NULL &&
-            call->call_operator.end - call->call_operator.start == 1 &&
+            !yarp_safe_call_p(call) &&
             mid == sym_nil_p && call->arguments == NULL) {
           nil_p = TRUE;
           codegen(s, call->receiver, VAL);
@@ -2814,7 +2816,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     codegen(s, range->right, val);
     if (!val)
       break;
-    // TODO: Add field to differentiate '..' and '...' ?
+    // TODO: Add field to differentiate '..' and '...' ? Or replace location with token?
     if (range->operator_loc.end - range->operator_loc.start == 2) {
       pop(); pop();
       genop_1(s, OP_RANGE_INC, cursp());
