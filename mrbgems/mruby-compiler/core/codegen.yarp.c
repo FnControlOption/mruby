@@ -3707,11 +3707,14 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_ALIAS:
+  case YP_NODE_ALIAS_NODE:
     {
-      int a = new_sym(s, nsym(tree->car));
-      int b = new_sym(s, nsym(tree->cdr));
+      yp_alias_node_t *alias = (yp_alias_node_t*)node;
+      if (alias->new_name->type != YP_NODE_SYMBOL_NODE || alias->old_name->type != YP_NODE_SYMBOL_NODE) {
+        codegen_error(s, "alias only supports simple symbols");
+      }
+      int a = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)alias->new_name)->value));
+      int b = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)alias->old_name)->value));
 
       genop_2(s, OP_ALIAS, a, b);
       if (val) {
@@ -3721,14 +3724,17 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
    break;
 
-  case NODE_UNDEF:
+  case YP_NODE_UNDEF_NODE:
     {
-      node *t = tree;
+      yp_undef_node_t *undef = (yp_undef_node_t*)node;
 
-      while (t) {
-        int symbol = new_sym(s, nsym(t->car));
+      for (size_t i = 0; i < undef->names.size; i++) {
+        yp_node_t *n = undef->names.nodes[i];
+        if (n->type != YP_NODE_SYMBOL_NODE) {
+          codegen_error(s, "undef only supports simple symbols");
+        }
+        int symbol = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)n)->value));
         genop_1(s, OP_UNDEF, symbol);
-        t = t->cdr;
       }
       if (val) {
         genop_1(s, OP_LOADNIL, cursp());
@@ -3737,6 +3743,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_CLASS:
     {
       int idx;
