@@ -1143,7 +1143,6 @@ new_lit_int(codegen_scope *s, mrb_int num)
   return i;
 }
 
-#if 0
 #ifndef MRB_NO_FLOAT
 static int
 new_lit_float(codegen_scope *s, mrb_float num)
@@ -1166,7 +1165,6 @@ new_lit_float(codegen_scope *s, mrb_float num)
 
   return i;
 }
-#endif
 #endif
 
 static int
@@ -3388,11 +3386,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
 #ifndef MRB_NO_FLOAT
-  case NODE_FLOAT:
+  case YP_NODE_FLOAT_NODE:
     if (val) {
-      char *p = (char*)tree;
+      const char *p = node->location.start;
       double f;
       mrb_read_float(p, NULL, &f);
       int off = new_lit_float(s, (mrb_float)f);
@@ -3403,6 +3400,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
 #endif
 
+#if 0
   case NODE_NEGATE:
     {
       nt = nint(tree->car);
