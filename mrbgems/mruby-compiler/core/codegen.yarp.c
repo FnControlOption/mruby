@@ -2711,28 +2711,43 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     for_body(s, tree);
     if (val) push();
     break;
+#endif
 
-  case NODE_CASE:
+  case YP_NODE_CASE_NODE:
     {
+      yp_case_node_t *casenode = (yp_case_node_t*)node;
       int head = 0;
       uint32_t pos1, pos2, pos3, tmp;
-      node *n;
 
       pos3 = JMPLINK_START;
-      if (tree->car) {
+      if (casenode->predicate) {
         head = cursp();
-        codegen(s, tree->car, VAL);
+        codegen(s, casenode->predicate, VAL);
       }
-      tree = tree->cdr;
-      while (tree) {
-        n = tree->car->car;
+      for (size_t i = 0; i <= casenode->conditions.size; i++) {
+        yp_node_t **conditions;
+        size_t condition_count;
+        yp_statements_node_t *statements;
+        if (i < casenode->conditions.size) {
+          yp_node_t *n = casenode->conditions.nodes[i];
+          /*mrb_*/assert(n->type == YP_NODE_WHEN_NODE);
+          yp_when_node_t *when = (yp_when_node_t*)n;
+          conditions = when->conditions.nodes;
+          condition_count = when->conditions.size;
+          statements = when->statements;
+        } else {
+          conditions = NULL;
+          condition_count = 0;
+          if (casenode->consequent)
+            statements = casenode->consequent->statements;
+        }
         pos1 = pos2 = JMPLINK_START;
-        while (n) {
-          codegen(s, n->car, VAL);
+        for (size_t j = 0; j < condition_count; j++) {
+          codegen(s, conditions[j], VAL);
           if (head) {
             gen_move(s, cursp(), head, 0);
             push(); push(); pop(); pop(); pop();
-            if (nint(n->car->car) == NODE_SPLAT) {
+            if (conditions[j]->type == YP_NODE_SPLAT_NODE) {
               genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, __case_eqq)), 1);
             }
             else {
@@ -2744,18 +2759,16 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
           }
           tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, !head);
           pos2 = tmp;
-          n = n->cdr;
         }
-        if (tree->car->car) {
+        if (condition_count > 0) {
           pos1 = genjmp_0(s, OP_JMP);
           dispatch_linked(s, pos2);
         }
-        codegen(s, tree->car->cdr, val);
+        codegen(s, (yp_node_t*)statements, val);
         if (val) pop();
         tmp = genjmp(s, OP_JMP, pos3);
         pos3 = tmp;
         dispatch(s, pos1);
-        tree = tree->cdr;
       }
       if (val) {
         uint32_t pos = cursp();
@@ -2777,7 +2790,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
-#endif
 
   case YP_NODE_PROGRAM_NODE: {
     yp_program_node_t *program = (yp_program_node_t*)node;
@@ -2863,11 +2875,11 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
-
-  case NODE_SPLAT:
-    codegen(s, tree, val);
-    break;
 #endif
+
+  case YP_NODE_SPLAT_NODE:
+    codegen(s, ((yp_splat_node_t*)node)->expression, val);
+    break;
 
   case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
     gen_assignment(s, node, ((yp_global_variable_write_node_t*)node)->value, 0, val);
