@@ -1678,9 +1678,8 @@ gen_values(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int 
   return n;
 }
 
-#if 0
 static int
-gen_hash(codegen_scope *s, node *tree, int val, int limit)
+gen_hash(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int limit)
 {
   int slimit = GEN_VAL_STACK_MAX;
   if (cursp() >= GEN_LIT_ARY_MAX) slimit = INT16_MAX;
@@ -1688,8 +1687,9 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
   mrb_bool update = FALSE;
   mrb_bool first = TRUE;
 
-  while (tree) {
-    if (nint(tree->car->car->car) == NODE_KW_REST_ARGS) {
+  for (size_t i = 0; i < node_count; i++) {
+    if (nodes[i]->type == YP_NODE_ASSOC_SPLAT_NODE) {
+      yp_assoc_splat_node_t *splat = (yp_assoc_splat_node_t*)nodes[i];
       if (val && first) {
         genop_2(s, OP_HASH, cursp(), 0);
         push();
@@ -1706,7 +1706,7 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
         }
         push();
       }
-      codegen(s, tree->car->cdr, val);
+      codegen(s, splat->value, val);
       if (val && (len > 0 || update)) {
         pop(); pop();
         genop_1(s, OP_HASHCAT, cursp());
@@ -1716,11 +1716,12 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
       len = 0;
     }
     else {
-      codegen(s, tree->car->car, val);
-      codegen(s, tree->car->cdr, val);
+      /*mrb_*/assert(nodes[i]->type == YP_NODE_ASSOC_NODE);
+      yp_assoc_node_t *assoc = (yp_assoc_node_t*)nodes[i];
+      codegen(s, assoc->key, val);
+      codegen(s, assoc->value, val);
       len++;
     }
-    tree = tree->cdr;
     if (val && cursp() >= slimit) {
       pop_n(len*2);
       if (!update) {
@@ -1753,6 +1754,7 @@ gen_hash(codegen_scope *s, node *tree, int val, int limit)
   return len;
 }
 
+#if 0
 static void
 gen_call(codegen_scope *s, node *tree, int val, int safe)
 {
@@ -2864,11 +2866,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_HASH:
-  case NODE_KW_HASH:
+  case YP_NODE_HASH_NODE:
     {
-      int nk = gen_hash(s, tree, val, GEN_LIT_ARY_MAX);
+      yp_hash_node_t *hash = (yp_hash_node_t*)node;
+      int nk = gen_hash(s, hash->elements.nodes, hash->elements.size, val, GEN_LIT_ARY_MAX);
       if (val && nk >= 0) {
         pop_n(nk*2);
         genop_2(s, OP_HASH, cursp(), nk);
@@ -2876,7 +2877,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
     }
     break;
-#endif
 
   case YP_NODE_SPLAT_NODE:
     codegen(s, ((yp_splat_node_t*)node)->expression, val);
