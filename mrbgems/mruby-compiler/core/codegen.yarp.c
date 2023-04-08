@@ -3944,7 +3944,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case YP_NODE_DEF_NODE:
     {
       yp_def_node_t *def = (yp_def_node_t*)node;
-      if (def->receiver != NULL) { fprintf(stderr, "TODO\n"); exit(-1); }
+      if (def->receiver != NULL) { assert(false); } // TODO
       int sym = new_sym(s, yarp_sym(s->mrb, def->name));
       int idx = lambda_body(s, def->scope, def->parameters, def->statements, 0);
 

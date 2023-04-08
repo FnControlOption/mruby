@@ -977,7 +977,8 @@ mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
 
   // fprintf(stderr, "node->type : %d\n", node->type);
   yp_print_node(&parser, node);
-  mrb_p(mrb, yarp_load_exec(mrb, &parser, node, c));
+  yarp_load_exec(mrb, &parser, node, c);
+  // mrb_p(mrb, );
 
   // yp_buffer_t buffer;
   // yp_buffer_init(&buffer);
