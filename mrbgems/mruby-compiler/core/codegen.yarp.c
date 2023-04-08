@@ -1749,12 +1749,19 @@ gen_call(codegen_scope *s, yp_call_node_t *node, int val)
     gen_move(s, cursp(), recv, 1);
     skip = genjmp2_0(s, OP_JMPNIL, cursp(), val);
   }
+  yp_node_t *block = (yp_node_t*)node->block;
   if (node->arguments) {
     yp_node_list_t arguments = node->arguments->arguments;
     size_t argc = arguments.size;
     /*mrb_*/assert(argc > 0);
     yp_hash_node_t *kwargs = NULL;
-    if (arguments.nodes[argc - 1]->type == YP_NODE_HASH_NODE) {
+    if (arguments.nodes[argc - 1]->type == YP_NODE_BLOCK_ARGUMENT_NODE) {
+      if (block != NULL)
+        codegen_error(s, "both block arg and actual block given");
+      block = arguments.nodes[argc - 1];
+      argc -= 1;
+    }
+    if (argc > 0 && arguments.nodes[argc - 1]->type == YP_NODE_HASH_NODE) {
       yp_hash_node_t *hash = (yp_hash_node_t*)arguments.nodes[argc - 1];
       if (hash->opening.type == YP_TOKEN_NOT_PROVIDED) {
         argc -= 1;
@@ -1775,8 +1782,8 @@ gen_call(codegen_scope *s, yp_call_node_t *node, int val)
       if (nk < 0) nk = 15;
     }
   }
-  if (node->block) {
-    codegen(s, (yp_node_t*)node->block, VAL);
+  if (block) {
+    codegen(s, block, VAL);
     pop();
     noop = 1;
     blk = 1;
@@ -3430,9 +3437,11 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case NODE_ARG:
     /* should not happen */
     break;
+#endif
 
-  case NODE_BLOCK_ARG:
-    if (!tree) {
+  case YP_NODE_BLOCK_ARGUMENT_NODE: {
+    yp_block_argument_node_t *argument = (yp_block_argument_node_t*)node;
+    if (!argument->expression) {
       int idx = lv_idx(s, MRB_OPSYM_2(s->mrb, and));
 
       if (idx == 0) {
@@ -3444,10 +3453,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     else {
-      codegen(s, tree, val);
+      codegen(s, argument->expression, val);
     }
     break;
-#endif
+  }
 
   case YP_NODE_INTEGER_NODE:
     if (val) {
