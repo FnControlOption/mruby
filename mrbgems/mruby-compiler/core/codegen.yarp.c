@@ -71,7 +71,8 @@ typedef struct scope {
 
   struct scope *prev;
 
-  yp_scope_node_t *lv;
+  mrb_sym *lv;
+  size_t lvsize;
 
   uint16_t sp;
   uint32_t pc;
@@ -112,7 +113,7 @@ typedef struct scope {
   int rlev;                     /* recursion levels */
 } codegen_scope;
 
-static codegen_scope* scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, yp_scope_node_t *lv);
+static codegen_scope* scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, mrb_sym *lv, size_t lvsize);
 static void scope_finish(codegen_scope *s);
 static struct loopinfo *loop_push(codegen_scope *s, enum looptype t);
 static void loop_break(codegen_scope *s, node *tree);
@@ -1263,22 +1264,22 @@ node_len(node *tree)
   }
   return n;
 }
-#endif
 
 #define nint(x) ((int)(intptr_t)(x))
 #define nchar(x) ((char)(intptr_t)(x))
 #define nsym(x) ((mrb_sym)(intptr_t)(x))
 
 #define lv_name(lv) nsym((lv)->car)
+#endif
 
 static int
 lv_idx(codegen_scope *s, mrb_sym id)
 {
-  yp_scope_node_t *lv = s->lv;
+  mrb_sym *lv = s->lv;
   int n = 1;
 
-  for (size_t i = 0; lv && i < lv->locals.size; i++) {
-    if (yarp_sym(s->mrb, lv->locals.tokens[i]) == id) return n;
+  for (size_t i = 0; i < s->lvsize; i++) {
+    if (lv[i] == id) return n;
     n++;
   }
   return 0;
@@ -1348,7 +1349,7 @@ for_body(codegen_scope *s, yp_for_node_t *node)
   /* generate receiver */
   codegen(s, node->collection, VAL);
   /* generate loop-block */
-  s = scope_new(s->mrb, s->cxt, s, NULL);
+  s = scope_new(s->mrb, s->cxt, s, NULL, 0);
 
   push();                       /* push for a block parameter */
 
@@ -1380,11 +1381,144 @@ for_body(codegen_scope *s, yp_for_node_t *node)
   genop_3(s, OP_SENDB, cursp(), idx, 0);
 }
 
+static void
+count_destructured_parameters(yp_node_list_t parameters, size_t *lvsize)
+{
+  for (size_t i=0; i < parameters.size; i++) {
+    if (parameters.nodes[i]->type == YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE) {
+      (*lvsize)++;
+      count_destructured_parameters(((yp_required_destructured_parameter_node_t*)parameters.nodes[i])->parameters, lvsize);
+    }
+  }
+}
+
+static void
+init_required_parameters(codegen_scope *s, yp_node_list_t parameters, mrb_sym *lv, size_t *lvidx, size_t *ypidx)
+{
+  for (size_t i=0; i < parameters.size; i++) {
+    switch (parameters.nodes[i]->type) {
+    case YP_NODE_REQUIRED_PARAMETER_NODE:
+      lv[(*lvidx)++] = yarp_sym2(s->mrb, parameters.nodes[i]->location);
+      (*ypidx)++;
+      break;
+
+    case YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE:
+      lv[(*lvidx)++] = 0;
+      break;
+
+    default:
+      mrb_assert(FALSE);
+    }
+  }
+}
+
+static void
+init_destructured_parameters(codegen_scope *s, yp_node_list_t parameters, mrb_sym *lv, size_t *lvidx, size_t *ypidx)
+{
+    for (size_t i=0; i < parameters.size; i++) {
+      if (parameters.nodes[i]->type == YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE) {
+        yp_required_destructured_parameter_node_t *destructured = (yp_required_destructured_parameter_node_t*)parameters.nodes[i];
+
+        for (size_t j=0; j < destructured->parameters.size; j++) {
+          yp_node_t *node = destructured->parameters.nodes[j];
+          switch (node->type) {
+          case YP_NODE_REQUIRED_PARAMETER_NODE:
+            lv[(*lvidx)++] = yarp_sym2(s->mrb, node->location);
+            (*ypidx)++;
+            break;
+
+          case YP_NODE_SPLAT_NODE:
+            {
+              yp_splat_node_t *splat = (yp_splat_node_t*)node;
+              if (splat->expression) {
+                mrb_assert(splat->expression->type == YP_NODE_REQUIRED_PARAMETER_NODE);
+                lv[(*lvidx)++] = yarp_sym2(s->mrb, splat->expression->location);
+                (*ypidx)++;
+              }
+              break;
+            }
+
+          case YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE:
+            lv[(*lvidx)++] = 0;
+            break;
+
+          default:
+            mrb_assert(FALSE);
+          }
+        }
+
+        init_destructured_parameters(s, destructured->parameters, lv, lvidx, ypidx);
+      }
+    }
+}
+
 static int
-lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parameters, yp_node_t *statements, int blk)
+lambda_body(codegen_scope *s, yp_scope_node_t *scope, yp_parameters_node_t *parameters, yp_node_t *statements, int blk)
 {
   codegen_scope *parent = s;
-  s = scope_new(s->mrb, s->cxt, s, nlv);
+  size_t lvsize = 0;
+  mrb_sym *lv = NULL;
+  if (parameters != NULL) {
+    mrb_assert(scope != NULL);
+    lvsize = scope->locals.size;
+    if (parameters->keyword_rest == NULL && parameters->keywords.size > 0)
+      lvsize++;
+    if (parameters->block == NULL)
+      lvsize++;
+    count_destructured_parameters(parameters->requireds, &lvsize);
+    count_destructured_parameters(parameters->posts, &lvsize);
+    lv = (mrb_sym*)mrb_malloc(s->mrb, sizeof(mrb_sym)*lvsize);
+    size_t lvidx = 0, ypidx = 0;
+    init_required_parameters(s, parameters->requireds, lv, &lvidx, &ypidx);
+    for (size_t i=0; i < parameters->optionals.size; i++) {
+      lv[lvidx++] = yarp_sym(s->mrb, ((yp_optional_parameter_node_t*)parameters->optionals.nodes[i])->name);
+      ypidx++;
+    }
+    if (parameters->rest != NULL) {
+      yp_token_t name = ((yp_rest_parameter_node_t*)parameters->rest)->name;
+      if (name.type != YP_TOKEN_NOT_PROVIDED) {
+        lv[lvidx++] = yarp_sym(s->mrb, name);
+      } else {
+        lv[lvidx++] = MRB_OPSYM_2(s->mrb, mul);
+      }
+      ypidx++;
+    }
+    init_required_parameters(s, parameters->posts, lv, &lvidx, &ypidx);
+    if (parameters->keyword_rest != NULL) {
+      yp_token_t name = ((yp_keyword_rest_parameter_node_t*)parameters->keyword_rest)->name;
+      if (name.type != YP_TOKEN_NOT_PROVIDED) {
+        lv[lvidx++] = yarp_sym(s->mrb, name);
+      } else {
+        lv[lvidx++] = MRB_OPSYM_2(s->mrb, pow);
+      }
+      ypidx++;
+    } else if (parameters->keywords.size > 0) {
+      lv[lvidx++] = MRB_OPSYM_2(s->mrb, pow);
+    }
+    if (parameters->block != NULL) {
+      yp_token_t name = ((yp_block_parameter_node_t*)parameters->block)->name;
+      if (name.type != YP_TOKEN_NOT_PROVIDED) {
+        lv[lvidx++] = yarp_sym(s->mrb, name);
+      } else {
+        lv[lvidx++] = MRB_OPSYM_2(s->mrb, and);
+      }
+      ypidx++;
+    } else {
+      lv[lvidx++] = 0;
+    }
+    for (size_t i=0; i < parameters->keywords.size; i++) {
+      lv[lvidx++] = yarp_sym(s->mrb, yarp_keyword_parameter_name((yp_keyword_parameter_node_t*)parameters->keywords.nodes[i]));
+      ypidx++;
+    }
+    init_destructured_parameters(s, parameters->requireds, lv, &lvidx, &ypidx);
+    init_destructured_parameters(s, parameters->posts, lv, &lvidx, &ypidx);
+    mrb_assert(ypidx <= scope->locals.size);
+    while (ypidx < scope->locals.size) {
+      lv[lvidx++] = yarp_sym(s->mrb, scope->locals.tokens[ypidx]);
+      ypidx++;
+    }
+  }
+  s = scope_new(s->mrb, s->cxt, s, lv, lvsize);
 
   s->mscope = !blk;
 
@@ -1538,9 +1672,18 @@ lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parame
 }
 
 static int
-scope_body(codegen_scope *s, yp_scope_node_t *nlv, yp_node_t *statements, int val)
+scope_body(codegen_scope *s, yp_scope_node_t *node, yp_node_t *statements, int val)
 {
-  codegen_scope *scope = scope_new(s->mrb, s->cxt, s, nlv);
+  mrb_sym *lv = NULL;
+  size_t lvsize = 0;
+  if (node) {
+    lvsize = node->locals.size;
+    lv = (mrb_sym*)mrb_malloc(s->mrb, sizeof(mrb_sym)*lvsize);
+    for (size_t i=0; i < lvsize; i++) {
+      lv[i] = yarp_sym(s->mrb, node->locals.tokens[i]);
+    }
+  }
+  codegen_scope *scope = scope_new(s->mrb, s->cxt, s, lv, lvsize);
 
   codegen(scope, statements, VAL);
   gen_return(scope, OP_RETURN, scope->sp-1);
@@ -1859,6 +2002,7 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
   case NODE_NIL:
   case NODE_MASGN:
 #endif
+  case YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE:
     if (rhs) {
       codegen(s, rhs, VAL);
       pop();
@@ -2062,7 +2206,13 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
   case NODE_MASGN:
     gen_massignment(s, tree->car, sp, val);
     break;
+#endif
 
+  case YP_NODE_REQUIRED_DESTRUCTURED_PARAMETER_NODE:
+    gen_massignment(s, ((yp_required_destructured_parameter_node_t*)node)->parameters, sp, val);
+    break;
+
+#if 0
   /* splat without assignment */
   case NODE_NIL:
     break;
@@ -4021,7 +4171,7 @@ scope_add_irep(codegen_scope *s)
 }
 
 static codegen_scope*
-scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, yp_scope_node_t *nlv)
+scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, mrb_sym *nlv, size_t lvsize)
 {
   static const codegen_scope codegen_scope_zero = { 0 };
   mrb_pool *pool = mrb_pool_open(mrb);
@@ -4056,17 +4206,16 @@ scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, yp_scope_node_
   s->syms = (mrb_sym*)mrb_malloc(mrb, sizeof(mrb_sym)*s->scapa);
 
   s->lv = nlv;
-  s->sp += 1;                      /* add self */
-  if (nlv)
-    s->sp += nlv->locals.size;
+  s->lvsize = lvsize;
+  s->sp += lvsize+1;               /* add self */
   s->nlocals = s->sp;
   if (nlv) {
     mrb_sym *lv;
     size_t i = 0;
 
     s->irep->lv = lv = (mrb_sym*)mrb_malloc(mrb, sizeof(mrb_sym)*(s->nlocals-1));
-    for (i=0; i < nlv->locals.size; i++) {
-      lv[i] = yarp_sym(mrb, nlv->locals.tokens[i]);
+    for (i=0; i < lvsize; i++) {
+      lv[i] = nlv[i];
     }
     mrb_assert(i + 1 == s->nlocals);
   }
@@ -4257,7 +4406,7 @@ catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t 
 static struct RProc*
 generate_code(mrb_state *mrb, mrbc_context *cxt, yp_parser_t *p, yp_node_t *node, int val)
 {
-  codegen_scope *scope = scope_new(mrb, cxt, 0, 0);
+  codegen_scope *scope = scope_new(mrb, cxt, 0, 0, 0);
   struct mrb_jmpbuf *prev_jmp = mrb->jmp;
   struct mrb_jmpbuf jmpbuf;
   struct RProc *proc;
