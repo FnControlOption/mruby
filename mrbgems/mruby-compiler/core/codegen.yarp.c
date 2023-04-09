@@ -2119,6 +2119,7 @@ gen_massignment(codegen_scope *s, yp_node_list_t targets, int rhs, int val)
       gen_assignment(s, splat->expression, NULL, cursp(), NOVAL);
     }
     if (post > 0) {
+      idx++;
       while (idx < targets.size) {
         gen_assignment(s, targets.nodes[idx], NULL, cursp()+n, NOVAL);
         idx++;
