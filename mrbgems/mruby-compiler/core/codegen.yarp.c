@@ -35,6 +35,8 @@ MRB_INLINE mrb_sym yarp_sym3(mrb_state *mrb, const yp_string_t *string)
 { return mrb_intern(mrb, yp_string_source(string), yp_string_length(string)); }
 MRB_INLINE mrb_bool yarp_safe_call_p(yp_call_node_t *node)
 { return node->call_operator.type == YP_TOKEN_AMPERSAND_DOT; }
+MRB_INLINE yp_token_t yarp_keyword_parameter_name(yp_keyword_parameter_node_t *kwd)
+{ return (yp_token_t){.type = kwd->name.type, .start = kwd->name.start, .end = kwd->name.end - 1}; }
 
 #ifndef MRB_CODEGEN_LEVEL_MAX
 #define MRB_CODEGEN_LEVEL_MAX 256
@@ -1473,7 +1475,7 @@ lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parame
         mrb_assert(kargs[j]->type == YP_NODE_KEYWORD_PARAMETER_NODE);
         yp_keyword_parameter_node_t *kwd = (yp_keyword_parameter_node_t*)kargs[j];
         yp_node_t *def_arg = kwd->value;
-        mrb_sym kwd_sym = yarp_sym(s->mrb, (yp_token_t){.type = kwd->name.type, .start = kwd->name.start, .end = kwd->name.end - 1}); // TODO: Submit YARP PR
+        mrb_sym kwd_sym = yarp_sym(s->mrb, yarp_keyword_parameter_name(kwd));
 
         if (def_arg) {
           int idx;
