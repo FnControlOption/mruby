@@ -1329,6 +1329,7 @@ search_upvar(codegen_scope *s, mrb_sym id, int *idx)
     codegen_error(s, "No anonymous keyword rest parameter");
   }
   else {
+    // mrb_p(s->mrb, mrb_nil_value());
     // mrb_p(s->mrb, mrb_symbol_value(id));
     codegen_error(s, "Can't find local variables");
   }
