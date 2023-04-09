@@ -1352,7 +1352,7 @@ for_body(codegen_scope *s, yp_for_node_t *node)
 
   /* generate loop variable */
   genop_W(s, OP_ENTER, 0x40000);
-  /*mrb_*/assert(node->index->type == YP_NODE_MULTI_WRITE_NODE);
+  mrb_assert(node->index->type == YP_NODE_MULTI_WRITE_NODE);
   yp_multi_write_node_t *write = (yp_multi_write_node_t*)node->index;
   if (write->targets.size == 1) {
     gen_assignment(s, write->targets.nodes[0], NULL, 1, NOVAL);
@@ -1447,7 +1447,7 @@ lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parame
     }
     for (i=0; i<oa; i++) {
       int idx;
-      /*mrb_*/assert(oargs[i]->type == YP_NODE_OPTIONAL_PARAMETER_NODE);
+      mrb_assert(oargs[i]->type == YP_NODE_OPTIONAL_PARAMETER_NODE);
       yp_optional_parameter_node_t *parameter = (yp_optional_parameter_node_t*)oargs[i];
       mrb_sym id = yarp_sym(s->mrb, parameter->name);
 
@@ -1470,7 +1470,7 @@ lambda_body(codegen_scope *s, yp_scope_node_t *nlv, yp_parameters_node_t *parame
     if (ka > 0 || kd) {
       for (int j=0; j<ka; j++) {
         int jmpif_key_p, jmp_def_set = -1;
-        /*mrb_*/assert(kargs[j]->type == YP_NODE_KEYWORD_PARAMETER_NODE);
+        mrb_assert(kargs[j]->type == YP_NODE_KEYWORD_PARAMETER_NODE);
         yp_keyword_parameter_node_t *kwd = (yp_keyword_parameter_node_t*)kargs[j];
         yp_node_t *def_arg = kwd->value;
         mrb_sym kwd_sym = yarp_sym(s->mrb, (yp_token_t){.type = kwd->name.type, .start = kwd->name.start, .end = kwd->name.end - 1}); // TODO: Submit YARP PR
@@ -1694,7 +1694,7 @@ gen_hash(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int li
       len = 0;
     }
     else {
-      /*mrb_*/assert(nodes[i]->type == YP_NODE_ASSOC_NODE);
+      mrb_assert(nodes[i]->type == YP_NODE_ASSOC_NODE);
       yp_assoc_node_t *assoc = (yp_assoc_node_t*)nodes[i];
       codegen(s, assoc->key, val);
       codegen(s, assoc->value, val);
@@ -1754,7 +1754,7 @@ gen_call(codegen_scope *s, yp_call_node_t *node, int val)
   if (node->arguments) {
     yp_node_list_t arguments = node->arguments->arguments;
     size_t argc = arguments.size;
-    /*mrb_*/assert(argc > 0);
+    mrb_assert(argc > 0);
     yp_hash_node_t *kwargs = NULL;
     if (arguments.nodes[argc - 1]->type == YP_NODE_BLOCK_ARGUMENT_NODE) {
       if (block != NULL)
@@ -1881,8 +1881,8 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
 
   case YP_NODE_SPLAT_NODE:
     {
-      /*mrb_*/assert(rhs == NULL);
-      /*mrb_*/assert(val == NOVAL);
+      mrb_assert(rhs == NULL);
+      mrb_assert(val == NOVAL);
       yp_splat_node_t *splat = (yp_splat_node_t*)node;
       if (splat->expression)
         gen_assignment(s, splat->expression, NULL, sp, NOVAL);
@@ -1938,9 +1938,9 @@ gen_assignment(codegen_scope *s, yp_node_t *node, yp_node_t *rhs, int sp, int va
       gen_setxv(s, OP_SETCONST, sp, name, val);
       break;
     }
-    /*mrb_*/assert(target->type == YP_NODE_CONSTANT_PATH_NODE);
+    mrb_assert(target->type == YP_NODE_CONSTANT_PATH_NODE);
     yp_constant_path_node_t *path = (yp_constant_path_node_t*)target;
-    /*mrb_*/assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
+    mrb_assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
     name = yarp_sym2(s->mrb, path->child->location);
     if (sp) {
       gen_move(s, cursp(), sp, 0);
@@ -2553,7 +2553,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         predicate = ifnode->predicate;
         statements = (yp_node_t*)ifnode->statements;
         if (ifnode->consequent) {
-          /*mrb_*/assert(ifnode->consequent->type == YP_NODE_ELSE_NODE);
+          mrb_assert(ifnode->consequent->type == YP_NODE_ELSE_NODE);
           yp_else_node_t *elsenode = (yp_else_node_t*)ifnode->consequent;
           consequent = (yp_node_t*)elsenode->statements;
         }
@@ -2750,7 +2750,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         yp_statements_node_t *statements;
         if (i < casenode->conditions.size) {
           yp_node_t *n = casenode->conditions.nodes[i];
-          /*mrb_*/assert(n->type == YP_NODE_WHEN_NODE);
+          mrb_assert(n->type == YP_NODE_WHEN_NODE);
           yp_when_node_t *when = (yp_when_node_t*)n;
           conditions = when->conditions.nodes;
           condition_count = when->conditions.size;
@@ -2843,7 +2843,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
   case YP_NODE_CONSTANT_PATH_NODE: {
     yp_constant_path_node_t *path = (yp_constant_path_node_t*)node;
-    /*mrb_*/assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
+    mrb_assert(path->child->type == YP_NODE_CONSTANT_READ_NODE);
     if (path->parent) {
       int sym = new_sym(s, yarp_sym2(s->mrb, path->child->location));
 
@@ -3846,7 +3846,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         path = (yp_constant_path_node_t*)name;
         name = path->child;
       }
-      /*mrb_*/assert(name->type == YP_NODE_CONSTANT_READ_NODE);
+      mrb_assert(name->type == YP_NODE_CONSTANT_READ_NODE);
       int idx;
 
       if (path && path->parent == NULL) {
@@ -3892,7 +3892,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         path = (yp_constant_path_node_t*)name;
         name = path->child;
       }
-      /*mrb_*/assert(name->type == YP_NODE_CONSTANT_READ_NODE);
+      mrb_assert(name->type == YP_NODE_CONSTANT_READ_NODE);
       int idx;
 
       if (path && path->parent == NULL) {
