@@ -2529,6 +2529,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   tree = tree->cdr;
 #endif
   switch (node->type) {
+  case YP_NODE_STRING_INTERPOLATED_NODE:
+    node = (yp_node_t*)((yp_string_interpolated_node_t*)node)->statements;
+    /* fall through */
   case YP_NODE_STATEMENTS_NODE: {
     yp_node_list_t body = ((yp_statements_node_t*)node)->body;
     if (body.size > 0) {
@@ -3720,37 +3723,44 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case NODE_HEREDOC:
     tree = ((struct mrb_parser_heredoc_info*)tree)->doc;
     /* fall through */
-  case NODE_DSTR:
+#endif
+  case YP_NODE_INTERPOLATED_STRING_NODE:
     if (val) {
-      node *n = tree;
+      yp_interpolated_string_node_t *string = (yp_interpolated_string_node_t*)node;
 
-      if (!n) {
+      if (string->parts.size == 0) {
         genop_1(s, OP_LOADNIL, cursp());
         push();
         break;
       }
-      codegen(s, n->car, VAL);
-      n = n->cdr;
-      while (n) {
-        codegen(s, n->car, VAL);
+      size_t i = 0;
+      if (string->parts.nodes[0]->type == YP_NODE_STRING_NODE) {
+        codegen(s, string->parts.nodes[0], VAL);
+        i++;
+      } else {
+        genop_2(s, OP_STRING, cursp(), new_lit_str(s, "", 0));
+        push();
+      }
+      while (i < string->parts.size) {
+        codegen(s, string->parts.nodes[i], VAL);
         pop(); pop();
         genop_1(s, OP_STRCAT, cursp());
         push();
-        n = n->cdr;
+        i++;
       }
     }
     else {
-      node *n = tree;
+      yp_interpolated_string_node_t *string = (yp_interpolated_string_node_t*)node;
 
-      while (n) {
-        if (nint(n->car->car) != NODE_STR) {
-          codegen(s, n->car, NOVAL);
+      for (size_t i = 0; i < string->parts.size; i++) {
+        if (string->parts.nodes[i]->type != YP_NODE_STRING_NODE) {
+          codegen(s, string->parts.nodes[i], NOVAL);
         }
-        n = n->cdr;
       }
     }
     break;
 
+#if 0
   case NODE_WORDS:
     gen_literal_array(s, tree, FALSE, val);
     break;
