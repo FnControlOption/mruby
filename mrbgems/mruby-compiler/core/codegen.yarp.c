@@ -2491,21 +2491,27 @@ readint(codegen_scope *s, const char *p, const char *e, int base, mrb_bool neg, 
   return result;
 }
 
-#if 0
 static void
-gen_retval(codegen_scope *s, node *tree)
+gen_retval(codegen_scope *s, yp_node_list_t arguments)
 {
-  if (nint(tree->car) == NODE_SPLAT) {
-    codegen(s, tree, VAL);
+  if (arguments.size == 1 && arguments.nodes[0]->type == YP_NODE_SPLAT_NODE) {
+    codegen(s, arguments.nodes[0], VAL);
     pop();
     genop_1(s, OP_ARYSPLAT, cursp());
   }
+  else if (arguments.size == 1) {
+    codegen(s, arguments.nodes[0], VAL);
+    pop();
+  }
   else {
-    codegen(s, tree, VAL);
+    yp_array_node_t array = {
+      .base = {.type = YP_NODE_ARRAY_NODE},
+      .elements = arguments,
+    };
+    codegen(s, (yp_node_t*)&array, VAL);
     pop();
   }
 }
-#endif
 
 static mrb_bool
 true_always(yp_node_t *node)
@@ -3493,10 +3499,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
+#endif
 
-  case NODE_RETURN:
-    if (tree) {
-      gen_retval(s, tree);
+  case YP_NODE_RETURN_NODE: {
+    yp_return_node_t *ret = (yp_return_node_t*)node;
+    if (ret->arguments) {
+      gen_retval(s, ret->arguments->arguments);
     }
     else {
       genop_1(s, OP_LOADNIL, cursp());
@@ -3509,7 +3517,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     if (val) push();
     break;
+  }
 
+#if 0
   case NODE_YIELD:
     {
       codegen_scope *s2 = s;
