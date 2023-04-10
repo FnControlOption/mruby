@@ -361,6 +361,68 @@ genop_W(codegen_scope *s, mrb_code i, uint32_t a)
 #define NOVAL  0
 #define VAL    1
 
+static void
+gen_target_read(codegen_scope *s, yp_node_t *node) {
+  switch (node->type) {
+  case YP_NODE_GLOBAL_VARIABLE_WRITE_NODE:
+    {
+      yp_global_variable_read_node_t read = {
+        .base = {.type = YP_NODE_GLOBAL_VARIABLE_READ_NODE},
+        .name = ((yp_global_variable_write_node_t*)node)->name,
+      };
+      codegen(s, (yp_node_t*)&read, VAL);
+    }
+    break;
+
+  case YP_NODE_LOCAL_VARIABLE_WRITE_NODE:
+    {
+      yp_local_variable_read_node_t read = {
+        .base = {
+          .type = YP_NODE_LOCAL_VARIABLE_READ_NODE,
+          .location = ((yp_local_variable_write_node_t*)node)->name_loc,
+        },
+      };
+      codegen(s, (yp_node_t*)&read, VAL);
+    }
+    break;
+
+  case YP_NODE_INSTANCE_VARIABLE_WRITE_NODE:
+    {
+      yp_instance_variable_read_node_t read = {
+        .base = {
+          .type = YP_NODE_INSTANCE_VARIABLE_READ_NODE,
+          .location = ((yp_instance_variable_write_node_t*)node)->name_loc,
+        },
+      };
+      codegen(s, (yp_node_t*)&read, VAL);
+    }
+    break;
+
+  case YP_NODE_CLASS_VARIABLE_WRITE_NODE:
+    {
+      yp_class_variable_read_node_t read = {
+        .base = {
+          .type = YP_NODE_CLASS_VARIABLE_READ_NODE,
+          .location = ((yp_class_variable_write_node_t*)node)->name_loc,
+        },
+      };
+      codegen(s, (yp_node_t*)&read, VAL);
+    }
+    break;
+
+  case YP_NODE_CONSTANT_PATH_WRITE_NODE:
+    codegen(s, ((yp_constant_path_write_node_t*)node)->target, VAL);
+    break;
+
+  case YP_NODE_CALL_NODE:
+    codegen(s, node, VAL);
+    break;
+
+  default:
+    mrb_assert(FALSE);
+  }
+}
+
 static mrb_bool
 no_optimize(codegen_scope *s)
 {
@@ -1707,7 +1769,6 @@ nosplat(yp_array_node_t *array)
   return TRUE;
 }
 
-#if 0
 static mrb_sym
 attrsym(codegen_scope *s, mrb_sym a)
 {
@@ -1728,7 +1789,6 @@ attrsym(codegen_scope *s, mrb_sym a)
 
   return mrb_intern(s->mrb, name2, len+1);
 }
-#endif
 
 #define CALL_MAXARGS 15
 #define GEN_LIT_ARY_MAX 64
@@ -3144,17 +3204,48 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_OP_ASGN:
+  case YP_NODE_OPERATOR_ASSIGNMENT_NODE:
+  case YP_NODE_OPERATOR_AND_ASSIGNMENT_NODE:
+  case YP_NODE_OPERATOR_OR_ASSIGNMENT_NODE:
     {
-      mrb_sym sym = nsym(tree->cdr->car);
+      yp_node_t *target, *value;
+      mrb_sym sym;
+      switch (node->type) {
+      case YP_NODE_OPERATOR_ASSIGNMENT_NODE:
+        {
+          yp_operator_assignment_node_t *assignment = (yp_operator_assignment_node_t*)node;
+          target = assignment->target;
+          value = assignment->value;
+          sym = mrb_intern(s->mrb, assignment->operator.start, assignment->operator.end - assignment->operator.start - 1);
+        }
+        break;
+      case YP_NODE_OPERATOR_AND_ASSIGNMENT_NODE:
+        {
+          yp_operator_and_assignment_node_t *assignment = (yp_operator_and_assignment_node_t*)node;
+          target = assignment->target;
+          value = assignment->value;
+          sym = MRB_OPSYM_2(s->mrb, andand);
+        }
+        break;
+      case YP_NODE_OPERATOR_OR_ASSIGNMENT_NODE:
+        {
+          yp_operator_or_assignment_node_t *assignment = (yp_operator_or_assignment_node_t*)node;
+          target = assignment->target;
+          value = assignment->value;
+          sym = MRB_OPSYM_2(s->mrb, oror);
+        }
+        break;
+      default:
+        mrb_assert(FALSE);
+      }
       mrb_int len;
       const char *name = mrb_sym_name_len(s->mrb, sym, &len);
+      yp_call_node_t *call = NULL;
       int idx, callargs = -1, vsp = -1;
 
       if ((len == 2 && name[0] == '|' && name[1] == '|') &&
-          (nint(tree->car->car) == NODE_CONST ||
-           nint(tree->car->car) == NODE_CVAR)) {
+          (target->type == YP_NODE_CONSTANT_PATH_WRITE_NODE ||
+           target->type == YP_NODE_CLASS_VARIABLE_WRITE_NODE)) {
         int catch_entry, begin, end;
         int noexc, exc;
         struct loopinfo *lp;
@@ -3164,7 +3255,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         catch_entry = catch_handler_new(s);
         begin = s->pc;
         exc = cursp();
-        codegen(s, tree->car, VAL);
+        gen_target_read(s, target);
         end = s->pc;
         noexc = genjmp_0(s, OP_JMP);
         lp->type = LOOP_RESCUE;
@@ -3174,8 +3265,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         dispatch(s, noexc);
         loop_pop(s, NOVAL);
       }
-      else if (nint(tree->car->car) == NODE_CALL) {
-        node *n = tree->car->cdr;
+      else if (target->type == YP_NODE_CALL_NODE) {
+        call = (yp_call_node_t*)target;
         int base, i, nargs = 0;
         callargs = 0;
 
@@ -3183,11 +3274,11 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
           vsp = cursp();
           push();
         }
-        codegen(s, n->car, VAL);   /* receiver */
-        idx = new_sym(s, nsym(n->cdr->car));
+        codegen(s, call->receiver, VAL); /* receiver */
+        idx = new_sym(s, yarp_sym3(s->mrb, &call->name));
         base = cursp()-1;
-        if (n->cdr->cdr->car) {
-          nargs = gen_values(s, n->cdr->cdr->car->car, VAL, 13);
+        if (call->arguments) {
+          nargs = gen_values(s, call->arguments->arguments.nodes, call->arguments->arguments.size, VAL, 13);
           if (nargs >= 0) {
             callargs = nargs;
           }
@@ -3207,7 +3298,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         push();
       }
       else {
-        codegen(s, tree->car, VAL);
+        gen_target_read(s, target);
       }
       if (len == 2 &&
           ((name[0] == '|' && name[1] == '|') ||
@@ -3224,12 +3315,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         else {
           pos = genjmp2_0(s, name[0]=='|'?OP_JMPIF:OP_JMPNOT, cursp(), val);
         }
-        codegen(s, tree->cdr->cdr->car, VAL);
+        codegen(s, value, VAL);
         pop();
         if (val && vsp >= 0) {
           gen_move(s, vsp, cursp(), 1);
         }
-        if (nint(tree->car->car) == NODE_CALL) {
+        if (target->type == YP_NODE_CALL_NODE) {
           if (callargs == CALL_MAXARGS) {
             pop();
             genop_2(s, OP_ARYPUSH, cursp(), 1);
@@ -3239,16 +3330,16 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
             callargs++;
           }
           pop();
-          idx = new_sym(s, attrsym(s, nsym(tree->car->cdr->cdr->car)));
+          idx = new_sym(s, attrsym(s, yarp_sym3(s->mrb, &call->name)));
           genop_3(s, OP_SEND, cursp(), idx, callargs);
         }
         else {
-          gen_assignment(s, tree->car, NULL, cursp(), val);
+          gen_assignment(s, target, NULL, cursp(), val);
         }
         dispatch(s, pos);
         goto exit;
       }
-      codegen(s, tree->cdr->cdr->car, VAL);
+      codegen(s, value, VAL);
       push(); pop();
       pop(); pop();
 
@@ -3281,7 +3372,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         genop_3(s, OP_SEND, cursp(), idx, 1);
       }
       if (callargs < 0) {
-        gen_assignment(s, tree->car, NULL, cursp(), val);
+        gen_assignment(s, target, NULL, cursp(), val);
       }
       else {
         if (val && vsp >= 0) {
@@ -3296,12 +3387,13 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
           callargs++;
         }
         pop();
-        idx = new_sym(s, attrsym(s,nsym(tree->car->cdr->cdr->car)));
+        idx = new_sym(s, attrsym(s, yarp_sym3(s->mrb, &call->name)));
         genop_3(s, OP_SEND, cursp(), idx, callargs);
       }
     }
     break;
 
+#if 0
   case NODE_SUPER:
     {
       codegen_scope *s2 = s;
@@ -4395,7 +4487,6 @@ loop_pop(codegen_scope *s, int val)
   if (val) push();
 }
 
-#if 0
 static int
 catch_handler_new(codegen_scope *s)
 {
@@ -4417,7 +4508,6 @@ catch_handler_set(codegen_scope *s, int ent, enum mrb_catch_type type, uint32_t 
   mrb_irep_catch_handler_pack(end, e->end);
   mrb_irep_catch_handler_pack(target, e->target);
 }
-#endif
 
 static struct RProc*
 generate_code(mrb_state *mrb, mrbc_context *cxt, yp_parser_t *p, yp_node_t *node, int val)
