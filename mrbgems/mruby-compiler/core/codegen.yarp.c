@@ -2529,9 +2529,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   tree = tree->cdr;
 #endif
   switch (node->type) {
-  case YP_NODE_STRING_INTERPOLATED_NODE:
-    node = (yp_node_t*)((yp_string_interpolated_node_t*)node)->statements;
-    /* fall through */
   case YP_NODE_STATEMENTS_NODE: {
     yp_node_list_t body = ((yp_statements_node_t*)node)->body;
     if (body.size > 0) {
@@ -3758,6 +3755,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         }
       }
     }
+    break;
+
+  case YP_NODE_STRING_INTERPOLATED_NODE:
+    codegen(s, (yp_node_t*)((yp_string_interpolated_node_t*)node)->statements, val);
     break;
 
 #if 0
