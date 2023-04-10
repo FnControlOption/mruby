@@ -4039,7 +4039,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
 
   case YP_NODE_INTERPOLATED_SYMBOL_NODE: {
-    yp_interpolated_string_node_t string = {.base = {.type = YP_NODE_INTERPOLATED_STRING_NODE}, .parts = ((yp_interpolated_symbol_node_t*)node)->parts};
+    yp_interpolated_string_node_t string = {
+      .base = {.type = YP_NODE_INTERPOLATED_STRING_NODE},
+      .parts = ((yp_interpolated_symbol_node_t*)node)->parts,
+    };
     codegen(s, (yp_node_t*)&string, val);
     if (val) {
       gen_intern(s);
