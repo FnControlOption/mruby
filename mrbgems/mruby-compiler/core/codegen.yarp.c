@@ -3813,8 +3813,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case YP_NODE_STRING_NODE:
     if (val) {
       yp_string_node_t *string = (yp_string_node_t*)node;
-      const char *p = string->content.start;
-      mrb_int len = string->content.end - p;
+      const char *p = yp_string_source(&string->unescaped);
+      mrb_int len = yp_string_length(&string->unescaped);
       int off = new_lit_str(s, p, len);
 
       genop_2(s, OP_STRING, cursp(), off);
@@ -3910,8 +3910,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case YP_NODE_X_STRING_NODE:
     {
       yp_x_string_node_t *xstring = (yp_x_string_node_t*)node;
-      const char *p = xstring->content.start;
-      mrb_int len = xstring->content.end - p;
+      const char *p = yp_string_source(&xstring->unescaped);
+      mrb_int len = yp_string_length(&xstring->unescaped);
       int off = new_lit_str(s, p, len);
       int sym;
 
@@ -4031,7 +4031,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
   case YP_NODE_SYMBOL_NODE:
     if (val) {
-      int sym = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)node)->value));
+      int sym = new_sym(s, yarp_sym3(s->mrb, &((yp_symbol_node_t*)node)->unescaped));
 
       genop_2(s, OP_LOADSYM, cursp(), sym);
       push();
@@ -4084,8 +4084,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (alias->new_name->type != YP_NODE_SYMBOL_NODE || alias->old_name->type != YP_NODE_SYMBOL_NODE) {
         codegen_error(s, "alias only supports simple symbols");
       }
-      int a = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)alias->new_name)->value));
-      int b = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)alias->old_name)->value));
+      int a = new_sym(s, yarp_sym3(s->mrb, &((yp_symbol_node_t*)alias->new_name)->unescaped));
+      int b = new_sym(s, yarp_sym3(s->mrb, &((yp_symbol_node_t*)alias->old_name)->unescaped));
 
       genop_2(s, OP_ALIAS, a, b);
       if (val) {
@@ -4104,7 +4104,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         if (n->type != YP_NODE_SYMBOL_NODE) {
           codegen_error(s, "undef only supports simple symbols");
         }
-        int symbol = new_sym(s, yarp_sym(s->mrb, ((yp_symbol_node_t*)n)->value));
+        int symbol = new_sym(s, yarp_sym3(s->mrb, &((yp_symbol_node_t*)n)->unescaped));
         genop_1(s, OP_UNDEF, symbol);
       }
       if (val) {
