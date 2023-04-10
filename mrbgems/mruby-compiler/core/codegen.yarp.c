@@ -4110,10 +4110,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-  case YP_NODE_DEF_NODE:
-    {
-      yp_def_node_t *def = (yp_def_node_t*)node;
-      if (def->receiver != NULL) { assert(false); } // TODO
+  case YP_NODE_DEF_NODE: {
+    yp_def_node_t *def = (yp_def_node_t*)node;
+    if (def->receiver == NULL) {
       int sym = new_sym(s, yarp_sym(s->mrb, def->name));
       int idx = lambda_body(s, def->scope, def->parameters, def->statements, 0);
 
@@ -4125,16 +4124,11 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       genop_2(s, OP_DEF, cursp(), sym);
       if (val) push();
     }
-    break;
+    else {
+      int sym = new_sym(s, yarp_sym(s->mrb, def->name));
+      int idx = lambda_body(s, def->scope, def->parameters, def->statements, 0);
 
-#if 0
-  case NODE_SDEF:
-    {
-      node *recv = tree->car;
-      int sym = new_sym(s, nsym(tree->cdr->car));
-      int idx = lambda_body(s, tree->cdr->cdr, 0);
-
-      codegen(s, recv, VAL);
+      codegen(s, def->receiver, VAL);
       pop();
       genop_1(s, OP_SCLASS, cursp());
       push();
@@ -4145,7 +4139,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
+  }
 
+#if 0
   case NODE_POSTEXE:
     codegen(s, tree, NOVAL);
     break;
