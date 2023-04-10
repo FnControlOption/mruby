@@ -1168,13 +1168,11 @@ new_lit_str(codegen_scope *s, const char *str, mrb_int len)
   return i;
 }
 
-#if 0
 static int
 new_lit_cstr(codegen_scope *s, const char *str)
 {
   return new_lit_str(s, str, (mrb_int)strlen(str));
 }
-#endif
 
 static int
 new_lit_int(codegen_scope *s, mrb_int num)
@@ -2436,6 +2434,7 @@ gen_literal_array(codegen_scope *s, node *tree, mrb_bool sym, int val)
     }
   }
 }
+#endif
 
 static void
 raise_error(codegen_scope *s, const char *msg)
@@ -2444,7 +2443,6 @@ raise_error(codegen_scope *s, const char *msg)
 
   genop_1(s, OP_ERR, idx);
 }
-#endif
 
 static mrb_int
 readint(codegen_scope *s, const char *p, const char *e, int base, mrb_bool neg, mrb_bool *overflow)
@@ -3556,18 +3554,20 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     loop_break(s, tree);
     if (val) push();
     break;
+#endif
 
-  case NODE_NEXT:
+  case YP_NODE_NEXT_NODE: {
+    yp_next_node_t *next = (yp_next_node_t*)node;
     if (!s->loop) {
       raise_error(s, "unexpected next");
     }
     else if (s->loop->type == LOOP_NORMAL) {
-      codegen(s, tree, NOVAL);
+      codegen(s, (yp_node_t*)next->arguments, NOVAL);
       genjmp(s, OP_JMPUW, s->loop->pc0);
     }
     else {
-      if (tree) {
-        codegen(s, tree, VAL);
+      if (next->arguments) {
+        codegen(s, (yp_node_t*)next->arguments, VAL);
         pop();
       }
       else {
@@ -3577,7 +3577,25 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     if (val) push();
     break;
+  }
 
+  case YP_NODE_ARGUMENTS_NODE:
+    {
+      yp_arguments_node_t *arguments = (yp_arguments_node_t*)node;
+      if (arguments->arguments.size == 1) {
+        codegen(s, arguments->arguments.nodes[0], val);
+      }
+      else {
+        yp_array_node_t array = {
+          .base = {.type = YP_NODE_ARRAY_NODE},
+          .elements = arguments->arguments,
+        };
+        codegen(s, (yp_node_t*)&array, val);
+      }
+    }
+    break;
+
+#if 0
   case NODE_REDO:
     if (!s->loop || s->loop->type == LOOP_BEGIN || s->loop->type == LOOP_RESCUE) {
       raise_error(s, "unexpected redo");
