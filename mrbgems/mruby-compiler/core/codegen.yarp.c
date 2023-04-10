@@ -2285,7 +2285,6 @@ gen_massignment(codegen_scope *s, yp_node_list_t targets, int rhs, int val)
   }
 }
 
-#if 0
 static void
 gen_intern(codegen_scope *s)
 {
@@ -2304,6 +2303,7 @@ gen_intern(codegen_scope *s)
   push();
 }
 
+#if 0
 static void
 gen_literal_array(codegen_scope *s, node *tree, mrb_bool sym, int val)
 {
@@ -3926,14 +3926,14 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_DSYM:
-    codegen(s, tree, val);
+  case YP_NODE_INTERPOLATED_SYMBOL_NODE: {
+    yp_interpolated_string_node_t string = {.base = {.type = YP_NODE_INTERPOLATED_STRING_NODE}, .parts = ((yp_interpolated_symbol_node_t*)node)->parts};
+    codegen(s, (yp_node_t*)&string, val);
     if (val) {
       gen_intern(s);
     }
     break;
-#endif
+  }
 
   case YP_NODE_SELF_NODE:
     if (val) {
