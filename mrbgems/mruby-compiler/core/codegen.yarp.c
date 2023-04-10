@@ -2545,6 +2545,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
   }
 
+  case YP_NODE_PARENTHESES_NODE:
+    codegen(s, (yp_node_t*)((yp_parentheses_node_t*)node)->statements, val);
+    break;
+
 #if 0
   case NODE_RESCUE:
     {
