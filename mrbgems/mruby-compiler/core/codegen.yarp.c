@@ -3768,26 +3768,29 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
   case NODE_SYMBOLS:
     gen_literal_array(s, tree, TRUE, val);
     break;
+#endif
 
-  case NODE_DXSTR:
+  case YP_NODE_INTERPOLATED_X_STRING_NODE:
     {
-      node *n;
+      yp_interpolated_x_string_node_t *xstring = (yp_interpolated_x_string_node_t*)node;
       int sym = new_sym(s, MRB_SYM_2(s->mrb, Kernel));
 
       genop_1(s, OP_LOADSELF, cursp());
       push();
-      codegen(s, tree->car, VAL);
-      n = tree->cdr;
-      while (n) {
-        if (nint(n->car->car) == NODE_XSTR) {
-          n->car->car = (struct mrb_ast_node*)(intptr_t)NODE_STR;
-          mrb_assert(!n->cdr); /* must be the end */
-        }
-        codegen(s, n->car, VAL);
+      size_t i = 0;
+      if (xstring->parts.nodes[0]->type == YP_NODE_STRING_NODE) {
+        codegen(s, xstring->parts.nodes[0], VAL);
+        i++;
+      } else {
+        genop_2(s, OP_STRING, cursp(), new_lit_str(s, "", 0));
+        push();
+      }
+      while (i < xstring->parts.size) {
+        codegen(s, xstring->parts.nodes[i], VAL);
         pop(); pop();
         genop_1(s, OP_STRCAT, cursp());
         push();
-        n = n->cdr;
+        i++;
       }
       push();                   /* for block */
       pop_n(3);
@@ -3797,10 +3800,11 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-  case NODE_XSTR:
+  case YP_NODE_X_STRING_NODE:
     {
-      char *p = (char*)tree->car;
-      mrb_int len = nint(tree->cdr);
+      yp_x_string_node_t *xstring = (yp_x_string_node_t*)node;
+      const char *p = xstring->content.start;
+      mrb_int len = xstring->content.end - p;
       int off = new_lit_str(s, p, len);
       int sym;
 
@@ -3815,6 +3819,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_REGX:
     if (val) {
       char *p1 = (char*)tree->car;
