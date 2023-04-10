@@ -971,10 +971,12 @@ MRB_API mrb_value
 mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrbc_context *c)
 {
   yp_parser_t parser;
-  yp_parser_init(&parser, s, len, NULL);
+  yp_parser_init(&parser, s, len, c->filename);
 
   yp_node_t *node = yp_parse(&parser);
 
+  // fprintf(stderr, "%.*s\n", (int)len, s);
+  // mrb_p(mrb, mrb_str_new(mrb, s, len));
   // fprintf(stderr, "node->type : %d\n", node->type);
   yp_print_node(&parser, node);
   yarp_load_exec(mrb, &parser, node, c);
