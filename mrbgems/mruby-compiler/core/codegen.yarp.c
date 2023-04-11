@@ -2617,43 +2617,50 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     codegen(s, (yp_node_t*)((yp_parentheses_node_t*)node)->statements, val);
     break;
 
-#if 0
-  case NODE_RESCUE:
+  case YP_NODE_BEGIN_NODE:
     {
+      yp_begin_node_t *nbegin = (yp_begin_node_t*)node;
+      if (nbegin->ensure_clause) mrb_assert(false); // TODO
       int noexc;
       uint32_t exend, pos1, pos2, tmp;
       struct loopinfo *lp;
       int catch_entry, begin, end;
 
-      if (tree->car == NULL) goto exit;
+      if (nbegin->rescue_clause == NULL &&
+          nbegin->else_clause == NULL &&
+          nbegin->ensure_clause == NULL) {
+        codegen(s, (yp_node_t*)nbegin->statements, val);
+        goto exit;
+      }
       lp = loop_push(s, LOOP_BEGIN);
       lp->pc0 = new_label(s);
       catch_entry = catch_handler_new(s);
       begin = s->pc;
-      codegen(s, tree->car, VAL);
+      codegen(s, (yp_node_t*)nbegin->statements, VAL);
       pop();
       lp->type = LOOP_RESCUE;
       end = s->pc;
       noexc = genjmp_0(s, OP_JMP);
       catch_handler_set(s, catch_entry, MRB_CATCH_RESCUE, begin, end, s->pc);
-      tree = tree->cdr;
       exend = JMPLINK_START;
       pos1 = JMPLINK_START;
-      if (tree->car) {
-        node *n2 = tree->car;
+      if (nbegin->rescue_clause) {
+        yp_rescue_node_t *n2 = nbegin->rescue_clause;
         int exc = cursp();
 
         genop_1(s, OP_EXCEPT, exc);
         push();
         while (n2) {
-          node *n3 = n2->car;
-          node *n4 = n3->car;
+          size_t i = 0;
 
           dispatch(s, pos1);
           pos2 = JMPLINK_START;
           do {
-            if (n4 && n4->car && nint(n4->car->car) == NODE_SPLAT) {
-              codegen(s, n4->car, VAL);
+            yp_node_t *n4 = NULL;
+            if (i < n2->exceptions.size)
+              n4 = n2->exceptions.nodes[i];
+            if (n4 && n4->type == YP_NODE_SPLAT_NODE) {
+              codegen(s, n4, VAL);
               gen_move(s, cursp(), exc, 0);
               push_n(2); pop_n(2); /* space for one arg and a block */
               pop();
@@ -2661,7 +2668,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
             }
             else {
               if (n4) {
-                codegen(s, n4->car, VAL);
+                codegen(s, n4, VAL);
               }
               else {
                 genop_2(s, OP_GETCONST, cursp(), new_sym(s, MRB_SYM_2(s->mrb, StandardError)));
@@ -2672,24 +2679,22 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
             }
             tmp = genjmp2(s, OP_JMPIF, cursp(), pos2, val);
             pos2 = tmp;
-            if (n4) {
-              n4 = n4->cdr;
-            }
-          } while (n4);
+            i++;
+          } while (i < n2->exceptions.size);
           pos1 = genjmp_0(s, OP_JMP);
           dispatch_linked(s, pos2);
 
           pop();
-          if (n3->cdr->car) {
-            gen_assignment(s, n3->cdr->car, NULL, exc, NOVAL);
+          if (n2->exception) {
+            gen_assignment(s, n2->exception, NULL, exc, NOVAL);
           }
-          if (n3->cdr->cdr->car) {
-            codegen(s, n3->cdr->cdr->car, val);
+          if (n2->statements) {
+            codegen(s, (yp_node_t*)n2->statements, val);
             if (val) pop();
           }
           tmp = genjmp(s, OP_JMP, exend);
           exend = tmp;
-          n2 = n2->cdr;
+          n2 = n2->consequent;
           push();
         }
         if (pos1 != JMPLINK_START) {
@@ -2698,10 +2703,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         }
       }
       pop();
-      tree = tree->cdr;
       dispatch(s, noexc);
-      if (tree->car) {
-        codegen(s, tree->car, val);
+      if (nbegin->else_clause) {
+        codegen(s, (yp_node_t*)nbegin->else_clause->statements, val);
       }
       else if (val) {
         push();
@@ -2711,6 +2715,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
+#if 0
   case NODE_ENSURE:
     if (!tree->cdr || !tree->cdr->cdr ||
         (nint(tree->cdr->cdr->car) == NODE_BEGIN &&
