@@ -1936,6 +1936,25 @@ gen_hash(codegen_scope *s, yp_node_t **nodes, size_t node_count, int val, int li
 }
 
 static void
+init_args(codegen_scope *s, yp_node_t ***args, size_t *argc, yp_hash_node_t **kwargs, yp_node_t **block)
+{
+  mrb_assert(*argc > 0);
+  if ((*args)[*argc - 1]->type == YP_NODE_BLOCK_ARGUMENT_NODE) {
+    if (*block != NULL)
+      codegen_error(s, "both block arg and actual block given");
+    *block = (*args)[*argc - 1];
+    (*argc)--;
+  }
+  if (*argc > 0 && (*args)[*argc - 1]->type == YP_NODE_HASH_NODE) {
+    yp_hash_node_t *hash = (yp_hash_node_t*)(*args)[*argc - 1];
+    if (hash->opening.type == YP_TOKEN_NOT_PROVIDED) {
+      (*argc)--;
+      *kwargs = hash;
+    }
+  }
+}
+
+static void
 gen_call(codegen_scope *s, yp_call_node_t *node, int val)
 {
   mrb_sym sym = yarp_sym3(s->mrb, &node->name);
@@ -1955,25 +1974,12 @@ gen_call(codegen_scope *s, yp_call_node_t *node, int val)
   }
   yp_node_t *block = (yp_node_t*)node->block;
   if (node->arguments) {
-    yp_node_list_t arguments = node->arguments->arguments;
-    size_t argc = arguments.size;
-    mrb_assert(argc > 0);
+    yp_node_t **args = node->arguments->arguments.nodes;
+    size_t argc = node->arguments->arguments.size;
     yp_hash_node_t *kwargs = NULL;
-    if (arguments.nodes[argc - 1]->type == YP_NODE_BLOCK_ARGUMENT_NODE) {
-      if (block != NULL)
-        codegen_error(s, "both block arg and actual block given");
-      block = arguments.nodes[argc - 1];
-      argc -= 1;
-    }
-    if (argc > 0 && arguments.nodes[argc - 1]->type == YP_NODE_HASH_NODE) {
-      yp_hash_node_t *hash = (yp_hash_node_t*)arguments.nodes[argc - 1];
-      if (hash->opening.type == YP_TOKEN_NOT_PROVIDED) {
-        argc -= 1;
-        kwargs = hash;
-      }
-    }
+    init_args(s, &args, &argc, &kwargs, &block);
     if (argc > 0) {             /* positional arguments */
-      n = gen_values(s, arguments.nodes, argc, VAL, 14);
+      n = gen_values(s, args, argc, VAL, 14);
       if (n < 0) {              /* variable length */
         noop = 1;               /* not operator */
         n = 15;
