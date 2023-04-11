@@ -3529,9 +3529,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     break;
   }
 
-#if 0
-  case NODE_YIELD:
+  case YP_NODE_YIELD_NODE:
     {
+      yp_yield_node_t *yield = (yp_yield_node_t*)node;
       codegen_scope *s2 = s;
       int lv = 0, ainfo = -1;
       int n = 0, sendv = 0;
@@ -3546,8 +3546,8 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       }
       if (ainfo < 0) codegen_error(s, "invalid yield (SyntaxError)");
       push();
-      if (tree) {
-        n = gen_values(s, tree, VAL, 14);
+      if (yield->arguments) {
+        n = gen_values(s, yield->arguments->arguments.nodes, yield->arguments->arguments.size, VAL, 14);
         if (n < 0) {
           n = sendv = 1;
           push();
@@ -3561,7 +3561,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
-#endif
 
   case YP_NODE_BREAK_NODE:
     loop_break(s, (yp_break_node_t*)node);
