@@ -2543,7 +2543,6 @@ false_always(yp_node_t *node)
   }
 }
 
-#if 0
 static void
 gen_blkmove(codegen_scope *s, uint16_t ainfo, int lv)
 {
@@ -2560,7 +2559,6 @@ gen_blkmove(codegen_scope *s, uint16_t ainfo, int lv)
   }
   push();
 }
-#endif
 
 static void
 codegen(codegen_scope *s, yp_node_t *node, int val)
@@ -3403,9 +3401,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_SUPER:
+  case YP_NODE_SUPER_NODE:
     {
+      yp_super_node_t *super = (yp_super_node_t*)node;
       codegen_scope *s2 = s;
       int lv = 0;
       int n = 0, nk = 0, st = 0;
@@ -3416,25 +3414,33 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
         s2 = s2->prev;
         if (!s2) break;
       }
-      if (tree) {
-        node *args = tree->car;
-        if (args) {
-          st = n = gen_values(s, args, VAL, 14);
+      if (super->arguments || super->block) {
+        yp_node_t **args = NULL;
+        size_t argc = 0;
+        yp_hash_node_t *kwargs = NULL;
+        yp_node_t *block = (yp_node_t*)super->block;
+        if (super->arguments) {
+          args = super->arguments->arguments.nodes;
+          argc = super->arguments->arguments.size;
+          init_args(s, &args, &argc, &kwargs, &block);
+        }
+        if (argc > 0) {
+          st = n = gen_values(s, args, argc, VAL, 14);
           if (n < 0) {
             st = 1; n = 15;
             push();
           }
         }
         /* keyword arguments */
-        if (tree->cdr->car) {
-          nk = gen_hash(s, tree->cdr->car->cdr, VAL, 14);
+        if (kwargs) {
+          nk = gen_hash(s, kwargs->elements.nodes, kwargs->elements.size, VAL, 14);
           if (nk < 0) {st++; nk = 15;}
           else st += nk*2;
           n |= nk<<4;
         }
         /* block arguments */
-        if (tree->cdr->cdr) {
-          codegen(s, tree->cdr->cdr, VAL);
+        if (block) {
+          codegen(s, block, VAL);
         }
         else if (s2) gen_blkmove(s, s2->ainfo, lv);
         else {
@@ -3456,8 +3462,9 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-  case NODE_ZSUPER:
+  case YP_NODE_FORWARDING_SUPER_NODE:
     {
+      yp_forwarding_super_node_t *super = (yp_forwarding_super_node_t*)node;
       codegen_scope *s2 = s;
       int lv = 0;
       uint16_t ainfo = 0;
@@ -3483,15 +3490,15 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
           push();
         }
         /* block argument */
-        if (tree && tree->cdr && tree->cdr->cdr) {
+        if (super->block) {
           push();
-          codegen(s, tree->cdr->cdr, VAL);
+          codegen(s, (yp_node_t*)super->block, VAL);
         }
       }
       else {
         /* block argument */
-        if (tree && tree->cdr && tree->cdr->cdr) {
-          codegen(s, tree->cdr->cdr, VAL);
+        if (super->block) {
+          codegen(s, (yp_node_t*)super->block, VAL);
         }
         else {
           gen_blkmove(s, 0, lv);
@@ -3503,7 +3510,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
-#endif
 
   case YP_NODE_RETURN_NODE: {
     yp_return_node_t *ret = (yp_return_node_t*)node;
