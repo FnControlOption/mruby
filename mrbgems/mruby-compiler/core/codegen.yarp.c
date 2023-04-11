@@ -3611,8 +3611,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     }
     break;
 
-#if 0
-  case NODE_REDO:
+  case YP_NODE_REDO_NODE:
     if (!s->loop || s->loop->type == LOOP_BEGIN || s->loop->type == LOOP_RESCUE) {
       raise_error(s, "unexpected redo");
     }
@@ -3622,7 +3621,7 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     if (val) push();
     break;
 
-  case NODE_RETRY:
+  case YP_NODE_RETRY_NODE:
     {
       const char *msg = "unexpected retry";
       const struct loopinfo *lp = s->loop;
@@ -3639,7 +3638,6 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
-#endif
 
   case YP_NODE_LOCAL_VARIABLE_READ_NODE:
     if (val) {
