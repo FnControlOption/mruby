@@ -116,7 +116,7 @@ typedef struct scope {
 static codegen_scope* scope_new(mrb_state *mrb, mrbc_context *cxt, codegen_scope *prev, mrb_sym *lv, size_t lvsize);
 static void scope_finish(codegen_scope *s);
 static struct loopinfo *loop_push(codegen_scope *s, enum looptype t);
-static void loop_break(codegen_scope *s, node *tree);
+static void loop_break(codegen_scope *s, yp_break_node_t *node);
 static void loop_pop(codegen_scope *s, int val);
 
 /*
@@ -3561,12 +3561,12 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
       if (val) push();
     }
     break;
+#endif
 
-  case NODE_BREAK:
-    loop_break(s, tree);
+  case YP_NODE_BREAK_NODE:
+    loop_break(s, (yp_break_node_t*)node);
     if (val) push();
     break;
-#endif
 
   case YP_NODE_NEXT_NODE: {
     yp_next_node_t *next = (yp_next_node_t*)node;
@@ -4458,12 +4458,11 @@ loop_push(codegen_scope *s, enum looptype t)
   return p;
 }
 
-#if 0
 static void
-loop_break(codegen_scope *s, node *tree)
+loop_break(codegen_scope *s, yp_break_node_t *node)
 {
   if (!s->loop) {
-    codegen(s, tree, NOVAL);
+    codegen(s, (yp_node_t*)node->arguments, NOVAL);
     raise_error(s, "unexpected break");
   }
   else {
@@ -4471,12 +4470,12 @@ loop_break(codegen_scope *s, node *tree)
 
 
     loop = s->loop;
-    if (tree) {
+    if (node->arguments) {
       if (loop->reg < 0) {
-        codegen(s, tree, NOVAL);
+        codegen(s, (yp_node_t*)node->arguments, NOVAL);
       }
       else {
-        gen_retval(s, tree);
+        gen_retval(s, node->arguments->arguments);
       }
     }
     while (loop) {
@@ -4499,7 +4498,7 @@ loop_break(codegen_scope *s, node *tree)
       int tmp;
 
       if (loop->reg >= 0) {
-        if (tree) {
+        if (node->arguments) {
           gen_move(s, loop->reg, cursp(), 0);
         }
         else {
@@ -4510,14 +4509,13 @@ loop_break(codegen_scope *s, node *tree)
       loop->pc2 = tmp;
     }
     else {
-      if (!tree) {
+      if (!node->arguments) {
         genop_1(s, OP_LOADNIL, cursp());
       }
       gen_return(s, OP_BREAK, cursp());
     }
   }
 }
-#endif
 
 static void
 loop_pop(codegen_scope *s, int val)
