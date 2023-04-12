@@ -126,6 +126,8 @@ yp_token_type_to_str(yp_token_type_t token_type)
       return "INSTANCE_VARIABLE";
     case YP_TOKEN_INTEGER:
       return "INTEGER";
+    case YP_TOKEN_INTEGER_CONTENT:
+      return "INTEGER_CONTENT";
     case YP_TOKEN_KEYWORD_ALIAS:
       return "KEYWORD_ALIAS";
     case YP_TOKEN_KEYWORD_AND:

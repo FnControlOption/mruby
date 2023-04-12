@@ -74,6 +74,7 @@ typedef enum yp_token_type {
   YP_TOKEN_IMAGINARY_NUMBER, // an imaginary number literal
   YP_TOKEN_INSTANCE_VARIABLE, // an instance variable
   YP_TOKEN_INTEGER, // an integer (any base)
+  YP_TOKEN_INTEGER_CONTENT, // the contents of an integer (excluding base prefix)
   YP_TOKEN_KEYWORD_ALIAS, // alias
   YP_TOKEN_KEYWORD_AND, // and
   YP_TOKEN_KEYWORD_BEGIN, // begin
@@ -682,6 +683,8 @@ typedef struct yp_instance_variable_write_node {
 // IntegerNode
 typedef struct yp_integer_node {
   yp_node_t base;
+  yp_token_t content;
+  int integer_base;
 } yp_integer_node_t;
 
 // InterpolatedRegularExpressionNode

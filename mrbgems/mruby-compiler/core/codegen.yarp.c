@@ -3752,9 +3752,10 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
 
   case YP_NODE_INTEGER_NODE:
     if (val) {
-      const char *p = node->location.start;
-      const char *e = node->location.end;
-      int base = 10; // TODO
+      yp_integer_node_t *integer = (yp_integer_node_t*)node;
+      const char *p = integer->content.start;
+      const char *e = integer->content.end;
+      int base = integer->integer_base;
       mrb_int i;
       mrb_bool overflow;
 
@@ -4288,6 +4289,63 @@ codegen(codegen_scope *s, yp_node_t *node, int val)
     codegen(s, tree, NOVAL);
     break;
 #endif
+
+  case YP_NODE_RATIONAL_NODE:
+    {
+      static const char *Kernel = "Kernel";
+      yp_call_node_t call = {
+        .base.type = YP_NODE_CALL_NODE,
+        .receiver = (yp_node_t*)&(yp_constant_read_node_t){
+          .base.type = YP_NODE_CONSTANT_READ_NODE,
+          .base.location.start = Kernel,
+          .base.location.end = Kernel + 6
+        },
+        .call_operator.type = YP_TOKEN_DOT,
+        .arguments = &(yp_arguments_node_t){
+          .base.type = YP_NODE_ARGUMENTS_NODE,
+          .arguments.nodes = (yp_node_t*[1]){
+            ((yp_rational_node_t*)node)->numeric
+          },
+          .arguments.size = 1
+        },
+        .block = NULL
+      };
+      yp_string_constant_init(&call.name, "Rational", 8);
+      codegen(s, (yp_node_t*)&call, val);
+    }
+    break;
+
+  case YP_NODE_IMAGINARY_NODE:
+    {
+      static const char *Kernel = "Kernel";
+      static const char *zero = "0";
+      yp_call_node_t call = {
+        .base.type = YP_NODE_CALL_NODE,
+        .receiver = (yp_node_t*)&(yp_constant_read_node_t){
+          .base.type = YP_NODE_CONSTANT_READ_NODE,
+          .base.location.start = Kernel,
+          .base.location.end = Kernel + 6
+        },
+        .call_operator.type = YP_TOKEN_DOT,
+        .arguments = &(yp_arguments_node_t){
+          .base.type = YP_NODE_ARGUMENTS_NODE,
+          .arguments.nodes = (yp_node_t*[2]){
+            (yp_node_t*)&(yp_integer_node_t){
+              .base.type = YP_NODE_INTEGER_NODE,
+              .content.start = zero,
+              .content.end = zero + 1,
+              .integer_base = 10
+            },
+            ((yp_imaginary_node_t*)node)->numeric
+          },
+          .arguments.size = 2
+        },
+        .block = NULL
+      };
+      yp_string_constant_init(&call.name, "Complex", 7);
+      codegen(s, (yp_node_t*)&call, val);
+    }
+    break;
 
   default:
     fprintf(stderr, "unsupported: %d\n", node->type);

@@ -152,7 +152,9 @@ typedef struct yp_lex_mode {
     struct {
       yp_token_type_t type;
       const char *start;
+      const char *content_start;
       const char *end;
+      int base;
     } numeric;
     
     struct {
