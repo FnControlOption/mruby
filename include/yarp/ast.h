@@ -8,6 +8,8 @@
 #ifndef YARP_AST_H
 #define YARP_AST_H
 
+#include "yarp/defines.h"
+
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -652,6 +654,7 @@ typedef struct yp_if_node {
 // ImaginaryNode
 typedef struct yp_imaginary_node {
   yp_node_t base;
+  struct yp_node *numeric;
 } yp_imaginary_node_t;
 
 // InNode
@@ -923,6 +926,7 @@ typedef struct yp_range_node {
 // RationalNode
 typedef struct yp_rational_node {
   yp_node_t base;
+  struct yp_node *numeric;
 } yp_rational_node_t;
 
 // RedoNode

@@ -170,6 +170,116 @@ debug_scope(yp_parser_t *parser) {
 #endif
 
 /******************************************************************************/
+/* Lex mode manipulations                                                     */
+/******************************************************************************/
+
+// Push a new lex state onto the stack. If we're still within the pre-allocated
+// space of the lex state stack, then we'll just use a new slot. Otherwise we'll
+// allocate a new pointer and use that.
+static void
+lex_mode_push(yp_parser_t *parser, yp_lex_mode_t lex_mode) {
+  lex_mode.prev = parser->lex_modes.current;
+  parser->lex_modes.index++;
+
+  if (parser->lex_modes.index > YP_LEX_STACK_SIZE - 1) {
+    parser->lex_modes.current = (yp_lex_mode_t *) malloc(sizeof(yp_lex_mode_t));
+    *parser->lex_modes.current = lex_mode;
+  } else {
+    parser->lex_modes.stack[parser->lex_modes.index] = lex_mode;
+    parser->lex_modes.current = &parser->lex_modes.stack[parser->lex_modes.index];
+  }
+}
+
+// Pop the current lex state off the stack. If we're within the pre-allocated
+// space of the lex state stack, then we'll just decrement the index. Otherwise
+// we'll free the current pointer and use the previous pointer.
+static void
+lex_mode_pop(yp_parser_t *parser) {
+  if (parser->lex_modes.index == 0) {
+    parser->lex_modes.current->mode = YP_LEX_DEFAULT;
+  } else if (parser->lex_modes.index < YP_LEX_STACK_SIZE) {
+    parser->lex_modes.index--;
+    parser->lex_modes.current = &parser->lex_modes.stack[parser->lex_modes.index];
+  } else {
+    parser->lex_modes.index--;
+    yp_lex_mode_t *prev = parser->lex_modes.current->prev;
+    free(parser->lex_modes.current);
+    parser->lex_modes.current = prev;
+  }
+}
+
+// This is the equivalent of IS_lex_state is CRuby.
+static inline bool
+lex_state_p(yp_parser_t *parser, yp_lex_state_t state) {
+  return parser->lex_state & state;
+}
+
+typedef enum {
+  YP_IGNORED_NEWLINE_NONE = 0,
+  YP_IGNORED_NEWLINE_ALL,
+  YP_IGNORED_NEWLINE_PATTERN
+} yp_ignored_newline_type_t;
+
+static inline yp_ignored_newline_type_t
+lex_state_ignored_p(yp_parser_t *parser) {
+  bool ignored = lex_state_p(parser, YP_LEX_STATE_BEG | YP_LEX_STATE_CLASS | YP_LEX_STATE_FNAME | YP_LEX_STATE_DOT) && !lex_state_p(parser, YP_LEX_STATE_LABELED);
+
+  if (ignored) {
+    return YP_IGNORED_NEWLINE_ALL;
+  } else if (parser->lex_state == (YP_LEX_STATE_ARG | YP_LEX_STATE_LABELED)) {
+    return YP_IGNORED_NEWLINE_PATTERN;
+  } else {
+    return YP_IGNORED_NEWLINE_NONE;
+  }
+}
+
+static inline bool
+lex_state_beg_p(yp_parser_t *parser) {
+  return lex_state_p(parser, YP_LEX_STATE_BEG_ANY) || (parser->lex_state == (YP_LEX_STATE_ARG | YP_LEX_STATE_LABELED));
+}
+
+static inline bool
+lex_state_arg_p(yp_parser_t *parser) {
+  return lex_state_p(parser, YP_LEX_STATE_ARG_ANY);
+}
+
+static inline bool
+lex_state_spcarg_p(yp_parser_t *parser, bool space_seen) {
+  return lex_state_arg_p(parser) && space_seen && !yp_char_is_whitespace(*parser->current.end);
+}
+
+static inline bool
+lex_state_end_p(yp_parser_t *parser) {
+  return lex_state_p(parser, YP_LEX_STATE_END_ANY);
+}
+
+// This is the equivalent of IS_AFTER_OPERATOR in CRuby.
+static inline bool
+lex_state_operator_p(yp_parser_t *parser) {
+  return lex_state_p(parser, YP_LEX_STATE_FNAME | YP_LEX_STATE_DOT);
+}
+
+// Set the state of the lexer. This is defined as a function to be able to put a breakpoint in it.
+static inline void
+lex_state_set(yp_parser_t *parser, yp_lex_state_t state) {
+  parser->lex_state = state;
+}
+
+#if YP_DEBUG
+static inline void
+debug_lex_state_set(yp_parser_t *parser, yp_lex_state_t state, char const * caller_name, int line_number) {
+  fprintf(stderr, "Caller: %s:%d\nPrevious: ", caller_name, line_number);
+  debug_state(parser);
+  lex_state_set(parser, state);
+  fprintf(stderr, "Now: ");
+  debug_state(parser);
+  fprintf(stderr, "\n");
+}
+
+#define lex_state_set(parser, state) debug_lex_state_set(parser, state, __func__, __LINE__)
+#endif
+
+/******************************************************************************/
 /* Node-related functions                                                     */
 /******************************************************************************/
 
@@ -242,6 +352,14 @@ yp_statements_node_create(yp_parser_t *parser);
 // Append a new node to the given StatementsNode node's body.
 static void
 yp_statements_node_body_append(yp_statements_node_t *node, yp_node_t *statement);
+
+// Allocate a new MissingNode node.
+static yp_missing_node_t *
+yp_missing_node_create(yp_parser_t *parser, const char *start, const char *end) {
+  yp_missing_node_t *node = yp_alloc(parser, sizeof(yp_missing_node_t));
+  *node = (yp_missing_node_t) {{ .type = YP_NODE_MISSING_NODE, .location = { .start = start, .end = end } }};
+  return node;
+}
 
 // Allocate and initialize a new alias node.
 static yp_alias_node_t *
@@ -316,10 +434,10 @@ yp_arguments_node_create(yp_parser_t *parser) {
     {
       .type = YP_NODE_ARGUMENTS_NODE,
       .location = YP_LOCATION_NULL_VALUE(parser)
-    }
+    },
+    .arguments = YP_EMPTY_NODE_LIST
   };
 
-  yp_node_list_init(&node->arguments);
   return node;
 }
 
@@ -920,7 +1038,7 @@ yp_call_node_unary_create(yp_parser_t *parser, yp_token_t *operator, yp_node_t *
   node->receiver = receiver;
   node->message = *operator;
 
-  yp_string_constant_init(&node->name, name, strnlen(name, 2));
+  yp_string_constant_init(&node->name, name, strlen(name));
   return node;
 }
 
@@ -1548,13 +1666,97 @@ yp_if_node_ternary_create(yp_parser_t *parser, yp_node_t *predicate, const yp_to
   return yp_if_node_create(parser, question_mark, predicate, if_statements, (yp_node_t *)else_node, &end_keyword);
 }
 
+// Allocate and initialize a new IntegerNode node.
+static yp_integer_node_t *
+yp_integer_node_create(yp_parser_t *parser, const yp_token_t *token) {
+  assert(token->type == YP_TOKEN_INTEGER);
+  yp_integer_node_t *node = yp_alloc(parser, sizeof(yp_integer_node_t));
+  *node = (yp_integer_node_t) {{ .type = YP_NODE_INTEGER_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) }};
+  return node;
+}
+
+// Allocate and initialize a new RationalNode node.
+static yp_rational_node_t *
+yp_rational_node_create(yp_parser_t *parser, const yp_token_t *token) {
+  assert(token->type == YP_TOKEN_RATIONAL_NUMBER);
+  assert(parser->lex_modes.current->mode == YP_LEX_NUMERIC);
+
+  yp_node_t *numeric_node;
+  yp_token_t numeric_token = {
+    .type = parser->lex_modes.current->as.numeric.type,
+    .start = parser->lex_modes.current->as.numeric.start,
+    .end = parser->lex_modes.current->as.numeric.end
+  };
+  switch (parser->lex_modes.current->as.numeric.type) {
+    case YP_TOKEN_INTEGER: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_integer_node_create(parser, &numeric_token);
+      break;
+    }
+    case YP_TOKEN_FLOAT: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_float_node_create(parser, &numeric_token);
+      break;
+    }
+    default: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_missing_node_create(parser, numeric_token.start, numeric_token.end);
+      assert(false && "unreachable");
+    }
+  }
+
+  yp_rational_node_t *node = yp_alloc(parser, sizeof(yp_rational_node_t));
+
+  *node = (yp_rational_node_t) {
+    { .type = YP_NODE_RATIONAL_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) },
+    .numeric = numeric_node,
+  };
+  assert(parser->lex_modes.current->mode != YP_LEX_NUMERIC);
+  return node;
+}
+
 // Allocate and initialize a new ImaginaryNode node.
 static yp_imaginary_node_t *
 yp_imaginary_node_create(yp_parser_t *parser, const yp_token_t *token) {
   assert(token->type == YP_TOKEN_IMAGINARY_NUMBER);
+  assert(parser->lex_modes.current->mode == YP_LEX_NUMERIC);
+
+  yp_node_t *numeric_node;
+  yp_token_t numeric_token = {
+    .type = parser->lex_modes.current->as.numeric.type,
+    .start = parser->lex_modes.current->as.numeric.start,
+    .end = parser->lex_modes.current->as.numeric.end
+  };
+  switch (parser->lex_modes.current->as.numeric.type) {
+    case YP_TOKEN_INTEGER: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_integer_node_create(parser, &numeric_token);
+      break;
+    }
+    case YP_TOKEN_FLOAT: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_float_node_create(parser, &numeric_token);
+      break;
+    }
+    case YP_TOKEN_RATIONAL_NUMBER: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_rational_node_create(parser, &numeric_token);
+      break;
+    }
+    default: {
+      lex_mode_pop(parser);
+      numeric_node = (yp_node_t *)yp_missing_node_create(parser, numeric_token.start, numeric_token.end);
+      assert(false && "unreachable");
+    }
+  }
+
   yp_imaginary_node_t *node = yp_alloc(parser, sizeof(yp_imaginary_node_t));
 
-  *node = (yp_imaginary_node_t) {{ .type = YP_NODE_IMAGINARY_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) }};
+  *node = (yp_imaginary_node_t) {
+    { .type = YP_NODE_IMAGINARY_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) },
+    .numeric = numeric_node
+  };
+  assert(parser->lex_modes.current->mode != YP_LEX_NUMERIC);
   return node;
 }
 
@@ -1619,15 +1821,6 @@ yp_instance_variable_write_node_create(yp_parser_t *parser, yp_instance_variable
     .value = value
   };
 
-  return node;
-}
-
-// Allocate and initialize a new IntegerNode node.
-static yp_integer_node_t *
-yp_integer_node_create(yp_parser_t *parser, const yp_token_t *token) {
-  assert(token->type == YP_TOKEN_INTEGER);
-  yp_integer_node_t *node = yp_alloc(parser, sizeof(yp_integer_node_t));
-  *node = (yp_integer_node_t) {{ .type = YP_NODE_INTEGER_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) }};
   return node;
 }
 
@@ -1918,14 +2111,6 @@ yp_match_required_node_create(yp_parser_t *parser, yp_node_t *value, yp_node_t *
     .operator_loc = YP_LOCATION_TOKEN_VALUE(operator)
   };
 
-  return node;
-}
-
-// Allocate a new MissingNode node.
-static yp_missing_node_t *
-yp_missing_node_create(yp_parser_t *parser, const char *start, const char *end) {
-  yp_missing_node_t *node = yp_alloc(parser, sizeof(yp_missing_node_t));
-  *node = (yp_missing_node_t) {{ .type = YP_NODE_MISSING_NODE, .location = { .start = start, .end = end } }};
   return node;
 }
 
@@ -2382,16 +2567,6 @@ yp_range_node_create(yp_parser_t *parser, yp_node_t *left, const yp_token_t *ope
   return node;
 }
 
-// Allocate and initialize a new RationalNode node.
-static yp_rational_node_t *
-yp_rational_node_create(yp_parser_t *parser, const yp_token_t *token) {
-  assert(token->type == YP_TOKEN_RATIONAL_NUMBER);
-  yp_rational_node_t *node = yp_alloc(parser, sizeof(yp_rational_node_t));
-
-  *node = (yp_rational_node_t) {{ .type = YP_NODE_RATIONAL_NODE, .location = YP_LOCATION_TOKEN_VALUE(token) }};
-  return node;
-}
-
 // Allocate and initialize a new RedoNode node.
 static yp_redo_node_t *
 yp_redo_node_create(yp_parser_t *parser, const yp_token_t *token) {
@@ -2581,10 +2756,10 @@ yp_scope_node_create(yp_parser_t *parser, const yp_token_t *token) {
     {
       .type = YP_NODE_SCOPE_NODE,
       .location = YP_LOCATION_TOKEN_VALUE(token)
-    }
+    },
+    .locals = YP_EMPTY_TOKEN_LIST
   };
 
-  yp_token_list_init(&node->locals);
   return node;
 }
 
@@ -2688,10 +2863,10 @@ yp_statements_node_create(yp_parser_t *parser) {
     {
       .type = YP_NODE_STATEMENTS_NODE,
       .location = YP_LOCATION_NULL_VALUE(parser)
-    }
+    },
+    .body = YP_EMPTY_NODE_LIST
   };
 
-  yp_node_list_init(&node->body);
   return node;
 }
 
@@ -3741,116 +3916,6 @@ context_def_p(yp_parser_t *parser) {
 }
 
 /******************************************************************************/
-/* Lex mode manipulations                                                     */
-/******************************************************************************/
-
-// Push a new lex state onto the stack. If we're still within the pre-allocated
-// space of the lex state stack, then we'll just use a new slot. Otherwise we'll
-// allocate a new pointer and use that.
-static void
-lex_mode_push(yp_parser_t *parser, yp_lex_mode_t lex_mode) {
-  lex_mode.prev = parser->lex_modes.current;
-  parser->lex_modes.index++;
-
-  if (parser->lex_modes.index > YP_LEX_STACK_SIZE - 1) {
-    parser->lex_modes.current = (yp_lex_mode_t *) malloc(sizeof(yp_lex_mode_t));
-    *parser->lex_modes.current = lex_mode;
-  } else {
-    parser->lex_modes.stack[parser->lex_modes.index] = lex_mode;
-    parser->lex_modes.current = &parser->lex_modes.stack[parser->lex_modes.index];
-  }
-}
-
-// Pop the current lex state off the stack. If we're within the pre-allocated
-// space of the lex state stack, then we'll just decrement the index. Otherwise
-// we'll free the current pointer and use the previous pointer.
-static void
-lex_mode_pop(yp_parser_t *parser) {
-  if (parser->lex_modes.index == 0) {
-    parser->lex_modes.current->mode = YP_LEX_DEFAULT;
-  } else if (parser->lex_modes.index < YP_LEX_STACK_SIZE) {
-    parser->lex_modes.index--;
-    parser->lex_modes.current = &parser->lex_modes.stack[parser->lex_modes.index];
-  } else {
-    parser->lex_modes.index--;
-    yp_lex_mode_t *prev = parser->lex_modes.current->prev;
-    free(parser->lex_modes.current);
-    parser->lex_modes.current = prev;
-  }
-}
-
-// This is the equivalent of IS_lex_state is CRuby.
-static inline bool
-lex_state_p(yp_parser_t *parser, yp_lex_state_t state) {
-  return parser->lex_state & state;
-}
-
-typedef enum {
-  YP_IGNORED_NEWLINE_NONE = 0,
-  YP_IGNORED_NEWLINE_ALL,
-  YP_IGNORED_NEWLINE_PATTERN
-} yp_ignored_newline_type_t;
-
-static inline yp_ignored_newline_type_t
-lex_state_ignored_p(yp_parser_t *parser) {
-  bool ignored = lex_state_p(parser, YP_LEX_STATE_BEG | YP_LEX_STATE_CLASS | YP_LEX_STATE_FNAME | YP_LEX_STATE_DOT) && !lex_state_p(parser, YP_LEX_STATE_LABELED);
-
-  if (ignored) {
-    return YP_IGNORED_NEWLINE_ALL;
-  } else if (parser->lex_state == (YP_LEX_STATE_ARG | YP_LEX_STATE_LABELED)) {
-    return YP_IGNORED_NEWLINE_PATTERN;
-  } else {
-    return YP_IGNORED_NEWLINE_NONE;
-  }
-}
-
-static inline bool
-lex_state_beg_p(yp_parser_t *parser) {
-  return lex_state_p(parser, YP_LEX_STATE_BEG_ANY) || (parser->lex_state == (YP_LEX_STATE_ARG | YP_LEX_STATE_LABELED));
-}
-
-static inline bool
-lex_state_arg_p(yp_parser_t *parser) {
-  return lex_state_p(parser, YP_LEX_STATE_ARG_ANY);
-}
-
-static inline bool
-lex_state_spcarg_p(yp_parser_t *parser, bool space_seen) {
-  return lex_state_arg_p(parser) && space_seen && !yp_char_is_whitespace(*parser->current.end);
-}
-
-static inline bool
-lex_state_end_p(yp_parser_t *parser) {
-  return lex_state_p(parser, YP_LEX_STATE_END_ANY);
-}
-
-// This is the equivalent of IS_AFTER_OPERATOR in CRuby.
-static inline bool
-lex_state_operator_p(yp_parser_t *parser) {
-  return lex_state_p(parser, YP_LEX_STATE_FNAME | YP_LEX_STATE_DOT);
-}
-
-// Set the state of the lexer. This is defined as a function to be able to put a breakpoint in it.
-static inline void
-lex_state_set(yp_parser_t *parser, yp_lex_state_t state) {
-  parser->lex_state = state;
-}
-
-#if YP_DEBUG
-static inline void
-debug_lex_state_set(yp_parser_t *parser, yp_lex_state_t state, char const * caller_name, int line_number) {
-  fprintf(stderr, "Caller: %s:%d\nPrevious: ", caller_name, line_number);
-  debug_state(parser);
-  lex_state_set(parser, state);
-  fprintf(stderr, "Now: ");
-  debug_state(parser);
-  fprintf(stderr, "\n");
-}
-
-#define lex_state_set(parser, state) debug_lex_state_set(parser, state, __func__, __LINE__)
-#endif
-
-/******************************************************************************/
 /* Specific token lexers                                                      */
 /******************************************************************************/
 
@@ -3994,8 +4059,34 @@ lex_numeric(yp_parser_t *parser) {
     yp_token_type_t current = type;
     const char *end = parser->current.end;
 
-    if (match(parser, 'r')) type = YP_TOKEN_RATIONAL_NUMBER;
-    if (match(parser, 'i')) type = YP_TOKEN_IMAGINARY_NUMBER;
+    if (match(parser, 'r')) {
+      lex_mode_push(parser, (yp_lex_mode_t) {
+          .mode = YP_LEX_NUMERIC,
+          .as.numeric.type = current,
+          .as.numeric.start = parser->current.start,
+          .as.numeric.end = parser->current.end
+        });
+      type = YP_TOKEN_RATIONAL_NUMBER;
+    }
+
+    if (match(parser, 'i')) {
+      if (type == YP_TOKEN_RATIONAL_NUMBER) {
+        lex_mode_push(parser, (yp_lex_mode_t) {
+            .mode = YP_LEX_NUMERIC,
+            .as.numeric.type = type,
+            .as.numeric.start = parser->current.start,
+            .as.numeric.end = parser->current.end
+          });
+      } else {
+        lex_mode_push(parser, (yp_lex_mode_t) {
+            .mode = YP_LEX_NUMERIC,
+            .as.numeric.type = current,
+            .as.numeric.start = parser->current.start,
+            .as.numeric.end = parser->current.end
+          });
+      }
+      type = YP_TOKEN_IMAGINARY_NUMBER;
+    }
 
     const unsigned char uc = (const unsigned char) peek(parser);
     if (uc != '\0' && (uc >= 0x80 || ((uc >= 'a' && uc <= 'z') || (uc >= 'A' && uc <= 'Z')) || uc == '_')) {
@@ -4034,7 +4125,7 @@ lex_global_variable(yp_parser_t *parser) {
     case '\'': // $': string after last match
     case '+':  // $+: string matches last paren.
       parser->current.end++;
-      return YP_TOKEN_BACK_REFERENCE;
+      return lex_state_p(parser, YP_LEX_STATE_FNAME) ? YP_TOKEN_GLOBAL_VARIABLE : YP_TOKEN_BACK_REFERENCE;
 
     case '0': {
       parser->current.end++;
@@ -4066,8 +4157,7 @@ lex_global_variable(yp_parser_t *parser) {
 
     case '-':
       parser->current.end++;
-      __attribute__((fallthrough));
-
+      /* fallthrough */
     default: {
       size_t width;
 
@@ -4502,13 +4592,13 @@ lex_embdoc(yp_parser_t *parser) {
 
   // Now, loop until we find the end of the embedded documentation or the end of
   // the file.
-  while (parser->current.end + 4 < parser->end) {
+  while (parser->current.end + 4 <= parser->end) {
     parser->current.start = parser->current.end;
 
     // If we've hit the end of the embedded documentation then we'll return that
     // token here.
     if (strncmp(parser->current.end, "=end", 4) == 0 &&
-	(yp_char_is_whitespace(parser->current.end[4]) || parser->current.end + 4 == parser->end)) {
+	(parser->current.end + 4 == parser->end || yp_char_is_whitespace(parser->current.end[4]))) {
       const char *newline = memchr(parser->current.end, '\n', (size_t) (parser->end - parser->current.end));
       parser->current.end = newline == NULL ? parser->end : newline + 1;
       parser->current.type = YP_TOKEN_EMBDOC_END;
@@ -4584,6 +4674,7 @@ parser_lex(yp_parser_t *parser) {
     case YP_LEX_DEFAULT:
     case YP_LEX_EMBEXPR:
     case YP_LEX_EMBVAR:
+    case YP_LEX_NUMERIC:
 
     // We have a specific named label here because we are going to jump back to
     // this location in the event that we have lexed a token that should not be
@@ -4674,9 +4765,8 @@ parser_lex(yp_parser_t *parser) {
           }
 
           lexed_comment = true;
-          __attribute__((fallthrough));
         }
-
+        /* fallthrough */
         case '\r': {
           // The only way you can have carriage returns in this particular loop
           // is if you have a carriage return followed by a newline. In that
@@ -4686,10 +4776,8 @@ parser_lex(yp_parser_t *parser) {
           // we haven't already lexed a comment here because that falls through
           // into here as well.
           if (!lexed_comment) parser->current.end++;
-
-          __attribute__((fallthrough));
         }
-
+        /* fallthrough */
         case '\n': {
           if (parser->heredoc_end != NULL) {
             parser_flush_heredoc_end(parser);
@@ -4710,7 +4798,7 @@ parser_lex(yp_parser_t *parser) {
                 parser->current.type = YP_TOKEN_NEWLINE;
                 return;
               }
-              __attribute__((fallthrough));
+              /* fallthrough */
             case YP_IGNORED_NEWLINE_ALL:
               if (!lexed_comment) parser_lex_ignored_newline(parser);
               lexed_comment = false;
@@ -5365,7 +5453,11 @@ parser_lex(yp_parser_t *parser) {
           if (match(parser, '.')) {
             if (match(parser, '.')) {
               if (context_p(parser, YP_CONTEXT_DEF_PARAMS)) {
-                lex_state_set(parser, YP_LEX_STATE_ENDARG);
+		if (lex_state_p(parser, YP_LEX_STATE_END)) {
+		  lex_state_set(parser, YP_LEX_STATE_BEG);
+		} else {
+		  lex_state_set(parser, YP_LEX_STATE_ENDARG);
+		}
                 LEX(YP_TOKEN_UDOT_DOT_DOT);
               }
 
@@ -6781,8 +6873,8 @@ parse_target(yp_parser_t *parser, yp_node_t *target, yp_token_t *operator, yp_no
       // call ending with = or a local variable write, so it must be a
       // syntax error. In this case we'll fall through to our default
       // handling.
-      __attribute__((fallthrough));
     }
+    /* fallthrough */
     default:
       // In this case we have a node that we don't know how to convert into a
       // target. We need to treat it as an error. For now, we'll mark it as an
@@ -7162,9 +7254,8 @@ parse_arguments(yp_parser_t *parser, yp_arguments_node_t *arguments, bool accept
             break;
           }
         }
-
-        __attribute__((fallthrough));
       }
+      /* fallthrough */
       default: {
         if (argument == NULL) {
           argument = parse_expression(parser, YP_BINDING_POWER_DEFINED, "Expected to be able to parse an argument.");
@@ -7935,17 +8026,18 @@ parse_conditional(yp_parser_t *parser, yp_context_t context) {
 
 // This macro allows you to define a case statement for all of the keywords.
 // It's meant to be used in a switch statement.
-#define YP_CASE_KEYWORD YP_TOKEN_KEYWORD___LINE__: case YP_TOKEN_KEYWORD___FILE__: case YP_TOKEN_KEYWORD_ALIAS: \
-  case YP_TOKEN_KEYWORD_AND: case YP_TOKEN_KEYWORD_BEGIN: case YP_TOKEN_KEYWORD_BEGIN_UPCASE: \
+#define YP_CASE_KEYWORD YP_TOKEN_KEYWORD___ENCODING__: case YP_TOKEN_KEYWORD___FILE__: case YP_TOKEN_KEYWORD___LINE__: \
+  case YP_TOKEN_KEYWORD_ALIAS: case YP_TOKEN_KEYWORD_AND: case YP_TOKEN_KEYWORD_BEGIN: case YP_TOKEN_KEYWORD_BEGIN_UPCASE: \
   case YP_TOKEN_KEYWORD_BREAK: case YP_TOKEN_KEYWORD_CASE: case YP_TOKEN_KEYWORD_CLASS: case YP_TOKEN_KEYWORD_DEF: \
   case YP_TOKEN_KEYWORD_DEFINED: case YP_TOKEN_KEYWORD_DO: case YP_TOKEN_KEYWORD_DO_LOOP: case YP_TOKEN_KEYWORD_ELSE: \
-  case YP_TOKEN_KEYWORD_ELSIF: case YP_TOKEN_KEYWORD_END: case YP_TOKEN_KEYWORD_END_UPCASE: \
-  case YP_TOKEN_KEYWORD_ENSURE: case YP_TOKEN_KEYWORD_FALSE: case YP_TOKEN_KEYWORD_FOR: case YP_TOKEN_KEYWORD_IF: \
-  case YP_TOKEN_KEYWORD_IN: case YP_TOKEN_KEYWORD_MODULE: case YP_TOKEN_KEYWORD_NEXT: case YP_TOKEN_KEYWORD_NIL: \
-  case YP_TOKEN_KEYWORD_NOT: case YP_TOKEN_KEYWORD_OR: case YP_TOKEN_KEYWORD_REDO: case YP_TOKEN_KEYWORD_RESCUE: \
-  case YP_TOKEN_KEYWORD_RETRY: case YP_TOKEN_KEYWORD_RETURN: case YP_TOKEN_KEYWORD_SELF: case YP_TOKEN_KEYWORD_SUPER: \
-  case YP_TOKEN_KEYWORD_THEN: case YP_TOKEN_KEYWORD_TRUE: case YP_TOKEN_KEYWORD_UNDEF: case YP_TOKEN_KEYWORD_UNLESS: \
-  case YP_TOKEN_KEYWORD_UNTIL: case YP_TOKEN_KEYWORD_WHEN: case YP_TOKEN_KEYWORD_WHILE: case YP_TOKEN_KEYWORD_YIELD
+  case YP_TOKEN_KEYWORD_ELSIF: case YP_TOKEN_KEYWORD_END: case YP_TOKEN_KEYWORD_END_UPCASE: case YP_TOKEN_KEYWORD_ENSURE: \
+  case YP_TOKEN_KEYWORD_FALSE: case YP_TOKEN_KEYWORD_FOR: case YP_TOKEN_KEYWORD_IF: case YP_TOKEN_KEYWORD_IN: \
+  case YP_TOKEN_KEYWORD_MODULE: case YP_TOKEN_KEYWORD_NEXT: case YP_TOKEN_KEYWORD_NIL: case YP_TOKEN_KEYWORD_NOT: \
+  case YP_TOKEN_KEYWORD_OR: case YP_TOKEN_KEYWORD_REDO: case YP_TOKEN_KEYWORD_RESCUE: case YP_TOKEN_KEYWORD_RETRY: \
+  case YP_TOKEN_KEYWORD_RETURN: case YP_TOKEN_KEYWORD_SELF: case YP_TOKEN_KEYWORD_SUPER: case YP_TOKEN_KEYWORD_THEN: \
+  case YP_TOKEN_KEYWORD_TRUE: case YP_TOKEN_KEYWORD_UNDEF: case YP_TOKEN_KEYWORD_UNLESS: case YP_TOKEN_KEYWORD_UNTIL: \
+  case YP_TOKEN_KEYWORD_WHEN: case YP_TOKEN_KEYWORD_WHILE: case YP_TOKEN_KEYWORD_YIELD
+  
 
 // This macro allows you to define a case statement for all of the operators.
 // It's meant to be used in a switch statement.
@@ -8915,8 +9007,8 @@ parse_pattern(yp_parser_t *parser, bool top_pattern, const char *message) {
         leading_rest = true;
         break;
       }
-      __attribute__((fallthrough));
     }
+    /* fallthrough */
     default:
       node = parse_pattern_primitives(parser, message);
       break;
@@ -9552,6 +9644,10 @@ parse_expression_prefix(yp_parser_t *parser, yp_binding_power_t binding_power) {
 
       accept_any(parser, 2, YP_TOKEN_NEWLINE, YP_TOKEN_SEMICOLON);
       if (accept(parser, YP_TOKEN_KEYWORD_ELSE)) {
+        if (case_node->conditions.size < 1) {
+          yp_diagnostic_list_append(&parser->error_list, parser->previous.start, parser->previous.end, "Unexpected else without no when clauses in case statement.");
+        }
+
         yp_token_t else_keyword = parser->previous;
         yp_else_node_t *else_node;
 
@@ -9631,6 +9727,7 @@ parse_expression_prefix(yp_parser_t *parser, yp_binding_power_t binding_power) {
           return (yp_node_t *) yp_return_node_create(parser, &keyword, arguments);
         default:
           assert(false && "unreachable");
+          return (yp_node_t *) yp_missing_node_create(parser, parser->previous.start, parser->previous.end);
       }
     }
     case YP_TOKEN_KEYWORD_SUPER: {
@@ -10924,9 +11021,8 @@ parse_expression_infix(yp_parser_t *parser, yp_node_t *node, yp_binding_power_t 
           if (yp_call_node_vcall_p(call_node)) {
             yp_parser_local_add(parser, &call_node->message);
           }
-
-          __attribute__((fallthrough));
         }
+        /* fallthrough */
         case YP_CASE_WRITABLE: {
           parser_lex(parser);
           yp_node_t *value = parse_assignment_value(parser, previous_binding_power, binding_power, "Expected a value after =.");
@@ -10943,9 +11039,8 @@ parse_expression_infix(yp_parser_t *parser, yp_node_t *node, yp_binding_power_t 
             }
             default: {}
           }
-
-          __attribute__((fallthrough));
         }
+        /* fallthrough */
         default:
           parser_lex(parser);
 
@@ -10967,9 +11062,8 @@ parse_expression_infix(yp_parser_t *parser, yp_node_t *node, yp_binding_power_t 
           if (yp_call_node_vcall_p(call_node)) {
             yp_parser_local_add(parser, &call_node->message);
           }
-
-          __attribute__((fallthrough));
         }
+        /* fallthrough */
         case YP_CASE_WRITABLE: {
           yp_token_t operator = parser->current;
           parser_lex(parser);
@@ -11005,9 +11099,8 @@ parse_expression_infix(yp_parser_t *parser, yp_node_t *node, yp_binding_power_t 
           if (yp_call_node_vcall_p(call_node)) {
             yp_parser_local_add(parser, &call_node->message);
           }
-
-          __attribute__((fallthrough));
         }
+        /* fallthrough */
         case YP_CASE_WRITABLE: {
           yp_token_t operator = parser->current;
           parser_lex(parser);
@@ -11053,9 +11146,8 @@ parse_expression_infix(yp_parser_t *parser, yp_node_t *node, yp_binding_power_t 
           if (yp_call_node_vcall_p(call_node)) {
             yp_parser_local_add(parser, &call_node->message);
           }
-
-          __attribute__((fallthrough));
         }
+        /* fallthrough */
         case YP_CASE_WRITABLE: {
           yp_token_t operator = not_provided(parser);
           node = parse_target(parser, node, &operator, NULL);

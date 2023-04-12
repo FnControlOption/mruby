@@ -623,6 +623,7 @@ yp_serialize_node(yp_parser_t *parser, yp_node_t *node, yp_buffer_t *buffer) {
       break;
     }
     case YP_NODE_IMAGINARY_NODE: {
+      yp_serialize_node(parser, (yp_node_t *)((yp_imaginary_node_t *)node)->numeric, buffer);
       break;
     }
     case YP_NODE_IN_NODE: {
@@ -969,6 +970,7 @@ yp_serialize_node(yp_parser_t *parser, yp_node_t *node, yp_buffer_t *buffer) {
       break;
     }
     case YP_NODE_RATIONAL_NODE: {
+      yp_serialize_node(parser, (yp_node_t *)((yp_rational_node_t *)node)->numeric, buffer);
       break;
     }
     case YP_NODE_REDO_NODE: {
