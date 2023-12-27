@@ -6986,12 +6986,6 @@ mrb_load_detect_file_cxt(mrb_state *mrb, FILE *fp, mrb_ccontext *c)
 #endif
 
 MRB_API mrb_value
-mrb_load_nstring_cxt(mrb_state *mrb, const char *s, size_t len, mrb_ccontext *c)
-{
-  return mrb_load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
-}
-
-MRB_API mrb_value
 mrb_load_nstring(mrb_state *mrb, const char *s, size_t len)
 {
   return mrb_load_nstring_cxt(mrb, s, len, NULL);

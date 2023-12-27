@@ -3,12 +3,12 @@ MRuby::Gem::Specification.new 'mruby-compiler' do |spec|
   spec.author  = 'mruby developers'
   spec.summary = 'mruby compiler library'
 
-  objs = %w[codegen y.tab].map do |name|
-    src = "#{dir}/core/#{name}.c"
+  objs = Pathname.glob("#{dir}/**/*.c").map do |src|
     if build.cxx_exception_enabled?
-      build.compile_as_cxx(src)
+      build.compile_as_cxx(src.to_s)
     else
-      objfile(src.pathmap("#{build_dir}/core/%n"))
+      path = src.relative_path_from(dir)
+      objfile(path.to_s.pathmap("#{build_dir}/%d/%n"))
     end
   end
   build.libmruby_core_objs << objs

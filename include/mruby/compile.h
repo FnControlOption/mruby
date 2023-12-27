@@ -15,6 +15,7 @@
 MRB_BEGIN_DECL
 
 #include <mruby.h>
+#include <prism.h>
 
 struct mrb_parser_state;
 /* load context */
@@ -188,6 +189,7 @@ MRB_API struct mrb_parser_state* mrb_parse_file(mrb_state*,FILE*,mrb_ccontext*);
 MRB_API struct mrb_parser_state* mrb_parse_string(mrb_state*,const char*,mrb_ccontext*);
 MRB_API struct mrb_parser_state* mrb_parse_nstring(mrb_state*,const char*,size_t,mrb_ccontext*);
 MRB_API struct RProc* mrb_generate_code(mrb_state*, struct mrb_parser_state*);
+MRB_API struct RProc* mrb_pm_generate_code(mrb_state*, mrb_ccontext*, pm_parser_t*, pm_node_t*);
 MRB_API mrb_value mrb_load_exec(mrb_state *mrb, struct mrb_parser_state *p, mrb_ccontext *c);
 
 /** program load functions
